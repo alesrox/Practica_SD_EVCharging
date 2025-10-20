@@ -135,7 +135,7 @@ def socket_listener(gestor: EV_Central, host="0.0.0.0", port=5001):
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind((host, port))
     server.listen(5)
-    print(f"Socket escuchando en {host}:{port}")
+    print(f"[SOCKET] Escuchando en {host}:{port}")
 
     while True:
         client, addr = server.accept()
@@ -162,7 +162,7 @@ def handle_client(client_socket, gestor: EV_Central):
                 client_socket.send(b"ERROR - unknown msg")
 
         except Exception as e:
-            print("Error procesando mensaje:", e)
+            print("[SOCKET] Error procesando mensaje:", e)
             client_socket.send(b"ERROR")
 
 # =============================================================
@@ -181,7 +181,7 @@ def crear_consumidor():
     }
     consumer = Consumer(conf)
     consumer.subscribe([TOPIC])
-    print(f"🏭 Central escuchando solicitudes en topic '{TOPIC}'...")
+    print(f"[KAFKA-CONSUMER] Escuchando solicitudes en topic '{TOPIC}'...")
     return consumer
 
 def crear_productor():
@@ -210,10 +210,10 @@ def kafka_listener(gestor: EV_Central):
                 elif data.get("type") == "supply_response":
                     response_driver(data, status=data.get("status", "KO"))
             except Exception as e:
-                print(f"⚠️  Mensaje no válido recibido: {e}")
+                print(f"[KAFKA-CONSUMER] Mensaje no válido recibido: {e}")
                 continue
     except Exception as e:
-        print(f"❌ Error en el consumidor Kafka: {e}")
+        print(f"[KAFKA-CONSUMER] Error en el consumidor Kafka: {e}")
     finally:
         CONSUMER.close()
 
@@ -222,7 +222,7 @@ def procesar_solicitud_engine(data, gestor: EV_Central):
         engine_id = data.get("engine_id")
         correlation_id = data.get("correlation_id")
 
-        print(f"📥 Solicitud recibida de {engine_id} (ID {correlation_id})")
+        print(f"[ENGINE] Solicitud recibida de {engine_id} (ID {correlation_id})")
 
         status = "approved" if gestor.can_supply(correlation_id) else "denied"
 
@@ -237,18 +237,18 @@ def procesar_solicitud_engine(data, gestor: EV_Central):
         PRODUCER.produce(TOPIC, json.dumps(response).encode("utf-8"))
         PRODUCER.flush()
 
-        print(f"📤 Respuesta enviada a '{TOPIC}': {status}")
+        print(f"[CENTRAL] Respuesta enviada a '{TOPIC}': {status}")
     except Exception as e:
-        print(f"❌ Error procesando solicitud: {e}")
+        print(f"[CENTRAL] Error procesando solicitud: {e}")
 
 def procesar_solicitud_driver(data, gestor: EV_Central):
     driver_id = data.get("driver_id")
     engine_id = data.get("engine_id")
     correlation_id = data.get("correlation_id")
 
-    print(f"📥 Solicitud recibida de {driver_id} para suministrarse en {engine_id} (ID {correlation_id})")
+    print(f"[DRIVER] Solicitud de {driver_id} para usar en {engine_id} (ID {correlation_id})")
     if gestor.can_supply(engine_id):
-        print(f"El CP {engine_id} está Operativo. Comprobando disponibilidad...")
+        print(f"[CENTRAL] El CP {engine_id} está Operativo. Comprobando disponibilidad...")
         msg = {
             "type": "supply_request",
             "engine_id": engine_id,
@@ -261,7 +261,7 @@ def procesar_solicitud_driver(data, gestor: EV_Central):
         PRODUCER.flush()
     else:
         response_driver(data, status="KO")
-        print(f"❌ Suministro denegado para {driver_id} en {engine_id}")
+        print(f"[CENTRAL] Suministro denegado para {driver_id} en {engine_id}")
 
 def response_driver(data, status: str = "KO"):
     engine_id = data.get("engine_id")
@@ -269,7 +269,7 @@ def response_driver(data, status: str = "KO"):
     correlation_id = data.get("correlation_id")
 
     msg = "denegada" if status == "KO" else "aceptada"
-    print(f"Solicitud de {engine_id} por {driver_id}: {msg}")
+    print(f"[ENGINE] Solicitud de {engine_id} por {driver_id}: {msg}")
 
     response = {
         "type": "start_supply",

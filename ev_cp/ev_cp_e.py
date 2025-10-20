@@ -38,7 +38,7 @@ class Engine:
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server.bind((self.host, self.port))
         server.listen(5)
-        print(f"Engine escuchando en {self.host}:{self.port}")
+        print(f"[SOCKET] Escuchando en {self.host}:{self.port}")
 
         while True:
             client, addr = server.accept()
@@ -53,7 +53,7 @@ class Engine:
                 if mensaje.get("type") == "check" and not self.ko_mode:
                     client_socket.send(self.status.encode())
             except Exception as e:
-                print("Error procesando mensaje:", e)
+                print("[SOCKET] Error procesando mensaje:", e)
 
     def kafka_listener(self):
         try:
@@ -68,46 +68,55 @@ class Engine:
                     data = json.loads(msg.value().decode("utf-8"))
                     if data.get("engine_id") == self.id:
                         if data.get("type") == "engine_supply_response":
-                                print(f"💬 Respuesta recibida: {data.get('status')}")
-                                self.can_supply = True
-                        elif data.get("type") == "supply_request":
-                            print(f"🔌 Solicitud de inicio de suministro recibida para {data.get('driver_id')}")
-                            response = {
-                                "type": "supply_response",
-                                "engine_id": data.get("engine_id"),
-                                "driver_id": data.get("driver_id"),
-                                "correlation_id": data.get("correlation_id"),
-                                "status": "OK" if not self.can_supply else "KO",
-                                "timestamp": time.time()
-                            } 
-
+                            print(f"[CENTRAL] Respuesta recibida: {data.get('status')}")
                             self.can_supply = True
-                            self.producer.produce(TOPIC, json.dumps(response).encode("utf-8"))
-                            self.producer.flush()
+                        elif data.get("type") == "supply_request":
+                            self.supply_request(data)
                         elif data.get("type") == "start_supply":
                             self.driver = data.get("driver_id")
                             self.can_supply = True
                 except Exception as e:
-                    print(f"⚠️  Mensaje no válido recibido: {e}")
+                    print(f"[KAFKA-CONSUMER] Mensaje no válido recibido: {e}")
                     continue
         except Exception as e:
-            print(f"❌ Error en el consumidor Kafka: {e}")
+            print(f"[KAFKA-CONSUMER] Error en el consumidor Kafka: {e}")
         finally:
             self.consumer.close()
 
+    def supply_request(self, data):
+        c_id = data.get("correlation_id")
+        driver_id = data.get('driver_id')
+        print(f"[CENRAL] Solicitud ({c_id}) de suministro para {driver_id}")
+
+        response = {
+            "type": "supply_response",
+            "engine_id": data.get("engine_id"),
+            "driver_id": driver_id,
+            "correlation_id": c_id,
+            "status": "OK" if not self.can_supply else "KO",
+            "timestamp": time.time()
+        } 
+
+        self.can_supply = True
+        self.producer.produce(TOPIC, json.dumps(response).encode("utf-8"))
+        self.producer.flush()
+
+        msg = 'denegada' if self.can_supply else 'aceptada'
+        print(f"[ENGINE] Solicitud ({c_id}): {msg}")
+
     def iniciar_suministro(self):
         if not self.can_supply:
-            print("No se puede iniciar el suministro, no autorizado.")
+            print("[INFO] No se puede iniciar el suministro, no autorizado.")
             return
 
         if self.status == "SUMINISTRANDO":
-            print("Ya se esta suministrando")
+            print("[INFO] Ya se esta suministrando")
             return
 
         if not self.driver: pass
 
         self.status = "SUMINISTRANDO"
-        print("SUMINISTRANDO...")
+        print("[INFO] SUMINISTRANDO...")
         self.driver_msg("init_supply")
         while self.can_supply:
             time.sleep(0.5)
@@ -115,7 +124,7 @@ class Engine:
         self.driver_msg("end_supply")
         self.status = "ACTIVADO"
         self.driver = None
-        print("FINALIZADO")
+        print("[INFO] FINALIZADO")
 
     def driver_msg(self, msg_id: str = "init_supply"):
         if not self.driver: return
@@ -144,7 +153,7 @@ class Engine:
         
         self.producer.produce(TOPIC, json.dumps(mensaje).encode("utf-8"))
         self.producer.flush()
-        print(f"📤 Solicitud enviada al topic '{TOPIC}'")
+        print(f"[ENGINE] Solicitud enviada al topic '{TOPIC}'")
 
 
 def engine_ui(engine: Engine):

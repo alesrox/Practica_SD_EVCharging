@@ -35,27 +35,27 @@ class Driver:
                     data = json.loads(msg.value().decode("utf-8"))
                     if data.get("driver_id") == self.id:
                         if data.get("type") == "supply_request":
-                            print(f"Surtidor {data.get('engine_id')} disponible para suministro.")
+                            print(f"[INFO] Surtidor {data.get('engine_id')} disponible para suministro.")
                         elif data.get("type") == "start_supply":
                             engine_id = data.get("engine_id")
                             if data.get("status") == "OK":
-                                print(f"Suministro con {engine_id} iniciado ya puede conectar.")
+                                print(f"[INFO] Suministro con {engine_id} iniciado ya puede enchufar el vehículo.")
                             else:
-                                print(f"Solicitud denegada: Suministro con {engine_id}")
+                                print(f"[INFO] Suministro con {engine_id}: solicitud denegada")
                         elif data.get("type") == "init_supply":
-                            print("Suministrando...")
+                            print("[INFO] Suministrando...")
                         elif data.get("type") == "end_supply":
-                            print("Fin...")
+                            print("[INFO] Fin...")
                             exit(1)
                 except Exception as e:
-                    print(f"⚠️  Mensaje no válido recibido: {e}")
+                    print(f"[KAFKA-CONSUMER] Mensaje no válido recibido: {e}")
                     continue
         except Exception as e:
-            print(f"❌ Error en el consumidor Kafka: {e}")
+            print(f"[KAFKA-CONSUMER] Error en el consumidor Kafka: {e}")
         finally:
             self.consumer.close()
 
-    def solicitar_carga(self, cp_id: str = 'MAD1'):
+    def solicitar_carga(self, cp_id: str):
         mensaje = {
             "type": "driver_supply_request",
             "driver_id": self.id,
@@ -66,7 +66,7 @@ class Driver:
         
         self.producer.produce(TOPIC, json.dumps(mensaje).encode("utf-8"))
         self.producer.flush()
-        print(f"📤 Solicitud de carga enviada al topic '{TOPIC}'")
+        print(f"[KAFKA-PRODUCER] Solicitud de carga enviada al topic '{TOPIC}'")
 
 
 if __name__ == "__main__":
@@ -85,5 +85,5 @@ if __name__ == "__main__":
         filename=args.file
     )
 
-    threading.Thread(target=driver.solicitar_carga, args=(), daemon=True).start()
+    threading.Thread(target=driver.solicitar_carga, args=('MAD1',), daemon=True).start()
     driver.kafka_listener()
