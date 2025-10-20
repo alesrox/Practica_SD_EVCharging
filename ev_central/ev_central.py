@@ -166,8 +166,7 @@ def handle_client(client_socket, gestor: EV_Central):
 # =============================================================
 BROKER_HOST = "localhost"
 BROKER_PORT = 9092
-INPUT_TOPIC = "requests"
-OUTPUT_TOPIC = "responses"
+TOPIC = "central-cp"
 
 def crear_consumidor():
     conf = {
@@ -176,8 +175,8 @@ def crear_consumidor():
         'auto.offset.reset': 'earliest'
     }
     consumer = Consumer(conf)
-    consumer.subscribe([INPUT_TOPIC])
-    print(f"🏭 Central escuchando solicitudes en topic '{INPUT_TOPIC}'...")
+    consumer.subscribe([TOPIC])
+    print(f"🏭 Central escuchando solicitudes en topic '{TOPIC}'...")
     return consumer
 
 def crear_productor():
@@ -185,53 +184,94 @@ def crear_productor():
     producer = Producer(conf)
     return producer
 
-def procesar_solicitud(data, producer, gestor: EV_Central):
+CONSUMER = crear_consumidor()
+PRODUCER = crear_productor()
+
+def kafka_listener(gestor: EV_Central):
     try:
-        correlation_id = data["correlation_id"]
-        engine_id = data.get("engine_id", "unknown")
+        while True:
+            msg = CONSUMER.poll(1.0)
+            if msg is None: continue
+            if msg.error():
+                if msg.error().code() != KafkaError._PARTITION_EOF: 
+                    raise KafkaException(msg.error())
+                continue
+            try:
+                data = json.loads(msg.value().decode("utf-8"))
+                if data.get("type") == "supply_request_engine":
+                    procesar_solicitud_engine(data, gestor)
+                elif data.get("type") == "supply_request_driver":
+                    procesar_solicitud_driver(data, gestor)
+                elif data.get("type") == "request_start_supply_response":
+                    response_driver(data, status=data.type.get("status", "KO"))
+            except Exception as e:
+                print(f"⚠️  Mensaje no válido recibido: {e}")
+                continue
+    except Exception as e:
+        print(f"❌ Error en el consumidor Kafka: {e}")
+    finally:
+        CONSUMER.close()
 
-        print(f"📥 Solicitud recibida de {engine_id} (ID {correlation_id})")
+def procesar_solicitud_engine(data, gestor: EV_Central):
+    try:
+        engine_id = data.get("engine_id")
+        correlation_id = data.get("correlation_id")
 
+        print(f"📥 Solicitud recibida de {engine_id} (ID {correlation_id}-000)")
+
+        print(gestor.charching_points[id].estado)
         status = "approved" if gestor.can_supply(correlation_id) else "denied"
 
         response = {
+            "type": "supply_request_response",
             "correlation_id": correlation_id,
             "status": status,
             "timestamp": time.time()
         }
 
-        producer.produce(OUTPUT_TOPIC, json.dumps(response).encode("utf-8"))
-        producer.flush()
+        PRODUCER.produce(TOPIC, json.dumps(response).encode("utf-8"))
+        PRODUCER.flush()
 
-        print(f"📤 Respuesta enviada a '{OUTPUT_TOPIC}': {status}")
+        print(f"📤 Respuesta enviada a '{TOPIC}': {status}")
     except Exception as e:
         print(f"❌ Error procesando solicitud: {e}")
 
-def kafka_listener(gestor: EV_Central):
-    consumer = crear_consumidor()
-    producer = crear_productor()
+def procesar_solicitud_driver(data, gestor: EV_Central):
+    driver_id = data.get("driver_id")
+    engine_id = data.get("engine_id")
+    correlation_id = data.get("correlation_id")
 
-    try:
-        while True:
-            msg = consumer.poll(1.0)
-            if msg is None:
-                continue
-            if msg.error():
-                if msg.error().code() != KafkaError._PARTITION_EOF:
-                    raise KafkaException(msg.error())
-                continue
+    print(f"📥 Solicitud recibida de {driver_id} para suministrarse en {engine_id} (ID {correlation_id})")
+    if gestor.can_supply(engine_id):
+        print(f"El CP {engine_id} está disponible. Avisando suministro...")
+        msg = {
+            "type": "request_start_supply",
+            "engine_id": engine_id,
+            "driver_id": driver_id,
+            "correlation_id": correlation_id,
+            "timestamp": time.time()
+        }
 
-            try:
-                data = json.loads(msg.value().decode("utf-8"))
-                if data.get("type") == "supply_request":
-                    procesar_solicitud(data, producer, gestor)
-            except json.JSONDecodeError:
-                print("⚠️  Mensaje no válido recibido.")
-                continue
-    except KeyboardInterrupt:
-        print("\n🛑 Central detenida por el usuario.")
-    finally:
-        consumer.close()
+        Producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
+    else:
+        response_driver(data, status="KO")
+        print(f"❌ Suministro denegado para {driver_id} en {engine_id}")
+
+def response_driver(data, status: str = "KO"):
+    engine_id = data.get("engine_id")
+    driver_id = data.get("driver_id")
+    correlation_id = data.get("correlation_id")
+
+    response = {
+        "type": "start_supply_response",
+        "status": status,
+        "driver_id": driver_id,
+        "engine_id": engine_id,
+        "correlation_id": correlation_id,
+        "timestamp": time.time()
+    }
+
+    Producer.produce(TOPIC, json.dumps(response).encode("utf-8"))
 
 # =============================================================
 # EJECUCIÓN PRINCIPAL

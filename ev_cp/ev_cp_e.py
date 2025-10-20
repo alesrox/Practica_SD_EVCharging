@@ -9,6 +9,8 @@ from tkinter import messagebox
 
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 
+TOPIC = "central-cp"
+
 class Engine:
     def __init__(self, id, broker_host="localhost", broker_port=9092, port=5002):
         self.id = id
@@ -20,6 +22,15 @@ class Engine:
         self.port = port
 
         self.ko_mode = False
+        self.status = "ACTIVO"
+
+        self.consumer = Consumer({
+            'bootstrap.servers': f"{broker_host}:{broker_port}",
+            'group.id': 'central-service',
+            'auto.offset.reset': 'earliest'
+        })
+        self.consumer.subscribe([TOPIC])
+        self.producer = Producer({'bootstrap.servers': f"{broker_host}:{broker_port}"})
 
     def start(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -42,9 +53,41 @@ class Engine:
             except Exception as e:
                 print("Error procesando mensaje:", e)
 
+    def kafka_listener(self):
+        try:
+            while True:
+                msg = self.consumer.poll(1.0)
+                if msg is None: continue
+                if msg.error():
+                    if msg.error().code() != KafkaError._PARTITION_EOF: 
+                        raise KafkaException(msg.error())
+                    continue
+                try:
+                    data = json.loads(msg.value().decode("utf-8"))
+                    if data.get("type") == "request_start_supply_response":
+                        msg = {
+                            "type": "request_start_supply",
+                            "engine_id": data.get("engine_id"),
+                            "driver_id": data.get("driver_id"),
+                            "correlation_id": data.get("correlation_id"),
+                            "timestamp": time.time()
+                        }
+
+                        self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
+                    elif data.get("type") == "supply_request_response":
+                        pass
+                except Exception as e:
+                    print(f"⚠️  Mensaje no válido recibido: {e}")
+                    continue
+        except Exception as e:
+            print(f"❌ Error en el consumidor Kafka: {e}")
+        finally:
+            self.consumer.close()
+
+    # TODO: Revisar
     def solicitar_suministro(self):
-        request_topic = "requests"
-        response_topic = "responses"
+        request_topic = "central-cp"
+        response_topic = "central-cp"
         correlation_id = str(self.id)
 
         print(f"🛰️  Enviando solicitud de suministro con ID {correlation_id}")
@@ -67,8 +110,9 @@ class Engine:
         producer = Producer(producer_conf)
 
         mensaje = {
-            "type": "supply_request",
-            "engine_id": f"engine-{self.port}",
+            "type": "supply_request_engine",
+            "engine_id": self.id,
+            "from": "ev_engine",
             "timestamp": time.time(),
             "correlation_id": correlation_id
         }
@@ -115,7 +159,7 @@ class Engine:
             consumer.close()
 
         return status
-    
+
 def start_ui(engine: Engine):
     def toggle_ko():
         engine.ko_mode = not engine.ko_mode

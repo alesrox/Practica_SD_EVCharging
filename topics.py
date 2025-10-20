@@ -2,8 +2,8 @@ from confluent_kafka.admin import AdminClient, NewTopic
 
 admin = AdminClient({'bootstrap.servers': 'broker:29092'})
 
-topic0 = NewTopic("requests", num_partitions=1, replication_factor=1)
-topic1 = NewTopic("responses", num_partitions=1, replication_factor=1)
+topic0 = NewTopic("central-cp", num_partitions=1, replication_factor=1)
+topic1 = NewTopic("central-driver", num_partitions=1, replication_factor=1)
 fs = admin.create_topics([topic0, topic1])
 
 for topic, f in fs.items():
