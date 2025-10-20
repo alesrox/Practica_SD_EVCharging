@@ -46,11 +46,12 @@ class Monitor:
                 s.connect((self.engine_host, self.engine_port))
                 s.send(json.dumps(mensaje).encode("utf-8"))
                 respuesta = s.recv(1024)
-            if respuesta.decode() == "OK":
-                return "OK"
+
+            if respuesta.decode() in ["ACTIVADO", "SUMINISTRANDO", "PARADO", "AVERIADO"]:
+                return respuesta.decode()
         except (ConnectionRefusedError, socket.timeout):
             pass
-        return "KO"
+        return "AVERIADO"
 
     def update_status(self, intervalo: int = 1):
         while True:

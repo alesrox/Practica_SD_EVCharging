@@ -1,4 +1,5 @@
 import time
+import uuid
 import json
 import socket
 import argparse
@@ -20,7 +21,9 @@ class Engine:
         self.port = port
 
         self.ko_mode = False
-        self.status = "ACTIVO"
+        self.can_supply = False
+        self.driver = None
+        self.status = "ACTIVADO"
 
         self.consumer = Consumer({
             'bootstrap.servers': f"{broker_host}:{broker_port}",
@@ -32,6 +35,7 @@ class Engine:
 
     def start(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server.bind((self.host, self.port))
         server.listen(5)
         print(f"Engine escuchando en {self.host}:{self.port}")
@@ -47,7 +51,7 @@ class Engine:
                 if not data: return
                 mensaje = json.loads(data.decode("utf-8"))
                 if mensaje.get("type") == "check" and not self.ko_mode:
-                    client_socket.send(b"OK")
+                    client_socket.send(self.status.encode())
             except Exception as e:
                 print("Error procesando mensaje:", e)
 
@@ -64,22 +68,25 @@ class Engine:
                     data = json.loads(msg.value().decode("utf-8"))
                     if data.get("engine_id") == self.id:
                         if data.get("type") == "engine_supply_response":
-                            print(f"💬 Respuesta recibida: {data.get('status')}")
+                                print(f"💬 Respuesta recibida: {data.get('status')}")
+                                self.can_supply = True
                         elif data.get("type") == "supply_request":
                             print(f"🔌 Solicitud de inicio de suministro recibida para {data.get('driver_id')}")
                             response = {
                                 "type": "supply_response",
                                 "engine_id": data.get("engine_id"),
                                 "driver_id": data.get("driver_id"),
-                                "cantidad_kwh": data.get("cantidad_kwh"),
                                 "correlation_id": data.get("correlation_id"),
-                                "status": "OK",
+                                "status": "OK" if not self.can_supply else "KO",
                                 "timestamp": time.time()
-                            }
+                            } 
 
+                            self.can_supply = True
                             self.producer.produce(TOPIC, json.dumps(response).encode("utf-8"))
                             self.producer.flush()
-                        # TODO: start_supply
+                        elif data.get("type") == "start_supply":
+                            self.driver = data.get("driver_id")
+                            self.can_supply = True
                 except Exception as e:
                     print(f"⚠️  Mensaje no válido recibido: {e}")
                     continue
@@ -87,9 +94,45 @@ class Engine:
             print(f"❌ Error en el consumidor Kafka: {e}")
         finally:
             self.consumer.close()
-    
+
+    def iniciar_suministro(self):
+        if not self.can_supply:
+            print("No se puede iniciar el suministro, no autorizado.")
+            return
+
+        if self.status == "SUMINISTRANDO":
+            print("Ya se esta suministrando")
+            return
+
+        if not self.driver: pass
+
+        self.status = "SUMINISTRANDO"
+        print("SUMINISTRANDO...")
+        self.driver_msg("init_supply")
+        while self.can_supply:
+            time.sleep(0.5)
+
+        self.driver_msg("end_supply")
+        self.status = "ACTIVADO"
+        self.driver = None
+        print("FINALIZADO")
+
+    def driver_msg(self, msg_id: str = "init_supply"):
+        if not self.driver: return
+        msg = {
+            "type": msg_id,
+            "engine_id": self.id,
+            "driver_id": self.driver,
+            "timestamp": time.time()
+        } 
+        self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
+        self.producer.flush()
+
+
     def solicitar_suministro(self):
-        correlation_id = str(self.id)
+        if self.can_supply: return
+
+        correlation_id = str(uuid.uuid4())
 
         mensaje = {
             "type": "engine_supply_request",
@@ -111,6 +154,12 @@ def engine_ui(engine: Engine):
 
     def solicitar_suministro_ui():
         engine.solicitar_suministro()
+    
+    def conectar():
+        threading.Thread(target=engine.iniciar_suministro, args=(), daemon=True).start()
+
+    def desconectar():
+        engine.can_supply = False
 
     root = tk.Tk()
     root.title(f"Engine {engine.id}")
@@ -120,6 +169,12 @@ def engine_ui(engine: Engine):
 
     supply_button = tk.Button(root, text="Solicitar Suministro", width=20, command=solicitar_suministro_ui)
     supply_button.pack(pady=10)
+
+    on_button = tk.Button(root, text="Conectar", width=20, command=conectar)
+    on_button.pack(pady=10)
+
+    off_button = tk.Button(root, text="Desconectar", width=20, command=desconectar)
+    off_button.pack(pady=10)
 
     root.mainloop()
 
@@ -132,8 +187,6 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=5002, help="Puerto de escucha del Engine")
     args = parser.parse_args()
 
-    print(args.id, args.port, args.broker_host, args.broker_port)
-    exit()
     engine = Engine(
         id=args.id, port=args.port,
         broker_host=args.broker_host, 

@@ -91,7 +91,7 @@ class EV_Central_UI:
             else:
                 frame = tk.Frame(
                     self.contenedor,
-                    width=100,
+                    width=120,
                     height=50,
                     relief=tk.RAISED,
                     borderwidth=2,
@@ -132,6 +132,7 @@ class EV_Central_UI:
 # =============================================================
 def socket_listener(gestor: EV_Central, host="0.0.0.0", port=5001):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind((host, port))
     server.listen(5)
     print(f"Socket escuchando en {host}:{port}")
@@ -153,8 +154,8 @@ def handle_client(client_socket, gestor: EV_Central):
                 gestor.registrar_punto(mensaje["id"], mensaje["ubicacion"])
                 client_socket.send(b"OK - auth")
             elif tipo == "status":
-                estado_str = mensaje.get("status", "KO")
-                estado = EstadoCP.ACTIVADO if estado_str == "OK" else EstadoCP.AVERIADO
+                estado_str = mensaje.get("status", "AVERIADO")
+                estado = EstadoCP[estado_str]
                 gestor.actualizar_estado(mensaje["id"], estado)
                 client_socket.send(b"OK - status")
             else:
@@ -247,12 +248,11 @@ def procesar_solicitud_driver(data, gestor: EV_Central):
 
     print(f"📥 Solicitud recibida de {driver_id} para suministrarse en {engine_id} (ID {correlation_id})")
     if gestor.can_supply(engine_id):
-        print(f"El CP {engine_id} está disponible. Avisando suministro...")
+        print(f"El CP {engine_id} está Operativo. Comprobando disponibilidad...")
         msg = {
             "type": "supply_request",
             "engine_id": engine_id,
             "driver_id": driver_id,
-            "cantidad_kwh": data.get("cantidad_kwh"),
             "correlation_id": correlation_id,
             "timestamp": time.time()
         }
@@ -268,13 +268,15 @@ def response_driver(data, status: str = "KO"):
     driver_id = data.get("driver_id")
     correlation_id = data.get("correlation_id")
 
+    msg = "denegada" if status == "KO" else "aceptada"
+    print(f"Solicitud de {engine_id} por {driver_id}: {msg}")
+
     response = {
         "type": "start_supply",
         "status": status,
         "driver_id": driver_id,
         "engine_id": engine_id,
         "correlation_id": correlation_id,
-        "cantidad_kwh": data.get("cantidad_kwh"),
         "timestamp": time.time()
     }
 

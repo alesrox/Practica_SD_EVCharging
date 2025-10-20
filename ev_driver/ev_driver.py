@@ -39,9 +39,14 @@ class Driver:
                         elif data.get("type") == "start_supply":
                             engine_id = data.get("engine_id")
                             if data.get("status") == "OK":
-                                print(f"Suministro con {engine_id} iniciado")
+                                print(f"Suministro con {engine_id} iniciado ya puede conectar.")
                             else:
-                                print(f"Error iniciando suministro con {engine_id}")
+                                print(f"Solicitud denegada: Suministro con {engine_id}")
+                        elif data.get("type") == "init_supply":
+                            print("Suministrando...")
+                        elif data.get("type") == "end_supply":
+                            print("Fin...")
+                            exit(1)
                 except Exception as e:
                     print(f"⚠️  Mensaje no válido recibido: {e}")
                     continue
@@ -50,12 +55,11 @@ class Driver:
         finally:
             self.consumer.close()
 
-    def solicitar_carga(self, cp_id: str = 'MAD1', cantidad_kwh: float = 35.0):
+    def solicitar_carga(self, cp_id: str = 'MAD1'):
         mensaje = {
             "type": "driver_supply_request",
             "driver_id": self.id,
             "engine_id": cp_id,
-            "cantidad_kwh": cantidad_kwh,
             "timestamp": time.time(),
             "correlation_id": str(uuid.uuid4())
         }

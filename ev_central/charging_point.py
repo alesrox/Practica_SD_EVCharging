@@ -1,11 +1,11 @@
 from enum import Enum
 
 class EstadoCP(Enum):
-    ACTIVADO = "Activado"
-    PARADO = "Parado"
-    SUMINISTRANDO = "Suministrando"
-    AVERIADO = "Averiado"
-    DESCONECTADO = "Desconectado"
+    ACTIVADO = "ACTIVADO"
+    PARADO = "PARADO"
+    SUMINISTRANDO = "SUMINISTRANDO"
+    AVERIADO = "AVERIADO"
+    DESCONECTADO = "DESCONECTADO"
 
 class EV_CP:
     def __init__(
