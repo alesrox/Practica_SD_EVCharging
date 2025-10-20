@@ -3,15 +3,11 @@ import json
 import socket
 import argparse
 import threading
-
 import tkinter as tk
-from tkinter import messagebox
 
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 
 TOPIC = "central-request"
-_INPUT_TOPIC = "engine-response"
-_OUTPUT_TOPIC = "central-request"
 
 class Engine:
     def __init__(self, id, broker_host="localhost", broker_port=9092, port=5002):
@@ -67,18 +63,23 @@ class Engine:
                 try:
                     data = json.loads(msg.value().decode("utf-8"))
                     if data.get("engine_id") == self.id:
-                        if data.get("type") == "request_start_supply_response":
-                            msg = {
-                                "type": "request_start_supply",
+                        if data.get("type") == "engine_supply_response":
+                            print(f"💬 Respuesta recibida: {data.get('status')}")
+                        elif data.get("type") == "supply_request":
+                            print(f"🔌 Solicitud de inicio de suministro recibida para {data.get('driver_id')}")
+                            response = {
+                                "type": "supply_response",
                                 "engine_id": data.get("engine_id"),
                                 "driver_id": data.get("driver_id"),
+                                "cantidad_kwh": data.get("cantidad_kwh"),
                                 "correlation_id": data.get("correlation_id"),
+                                "status": "OK",
                                 "timestamp": time.time()
                             }
 
-                            self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
-                        elif data.get("type") == "supply_request_response":
-                            print(f"💬 Respuesta recibida: {data.get('status')}")
+                            self.producer.produce(TOPIC, json.dumps(response).encode("utf-8"))
+                            self.producer.flush()
+                        # TODO: start_supply
                 except Exception as e:
                     print(f"⚠️  Mensaje no válido recibido: {e}")
                     continue
@@ -91,7 +92,7 @@ class Engine:
         correlation_id = str(self.id)
 
         mensaje = {
-            "type": "supply_request_engine",
+            "type": "engine_supply_request",
             "engine_id": self.id,
             "from": "ev_engine",
             "timestamp": time.time(),
@@ -103,7 +104,7 @@ class Engine:
         print(f"📤 Solicitud enviada al topic '{TOPIC}'")
 
 
-def start_ui(engine: Engine):
+def engine_ui(engine: Engine):
     def toggle_ko():
         engine.ko_mode = not engine.ko_mode
         ko_button.config(text=f"KO Mode: {'ON' if engine.ko_mode else 'OFF'}")
@@ -124,14 +125,15 @@ def start_ui(engine: Engine):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Engine de CP")
-
     parser.add_argument("id", help="ID del Charging Point")
     parser.add_argument("--broker-host", default="localhost", help="IP de la central")
     parser.add_argument("--broker-port", type=int, default=9092, help="Puerto de la central")
-    parser.add_argument("--port", type=int, default=5002, help="Puerto de escucha del Engine")
     # parser.add_argument("--host", default="0.0.0.0", help="IP de EV_CP_M")
+    parser.add_argument("--port", type=int, default=5002, help="Puerto de escucha del Engine")
     args = parser.parse_args()
 
+    print(args.id, args.port, args.broker_host, args.broker_port)
+    exit()
     engine = Engine(
         id=args.id, port=args.port,
         broker_host=args.broker_host, 
@@ -141,4 +143,4 @@ if __name__ == "__main__":
     #engine.start()
     threading.Thread(target=engine.start, args=(), daemon=True).start()
     threading.Thread(target=engine.kafka_listener, args=(), daemon=True).start()
-    start_ui(engine)
+    engine_ui(engine)

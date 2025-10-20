@@ -171,9 +171,6 @@ BROKER_HOST = "localhost"
 BROKER_PORT = 9092
 
 TOPIC = "central-request"
-_INPUT_TOPIC = "central-request"
-_OUTPUT_ENGINE_TOPIC = "engine-response"
-_OUTPUT_DRIVER_TOPIC = "driver-response"
 
 def crear_consumidor():
     conf = {
@@ -205,12 +202,12 @@ def kafka_listener(gestor: EV_Central):
                 continue
             try:
                 data = json.loads(msg.value().decode("utf-8"))
-                if data.get("type") == "supply_request_engine":
-                    procesar_solicitud_engine(data, gestor)
-                elif data.get("type") == "supply_request_driver":
+                if data.get("type") == "driver_supply_request":
                     procesar_solicitud_driver(data, gestor)
-                elif data.get("type") == "request_start_supply_response":
-                    response_driver(data, status=data.type.get("status", "KO"))
+                elif data.get("type") == "engine_supply_request":
+                    procesar_solicitud_engine(data, gestor)
+                elif data.get("type") == "supply_response":
+                    response_driver(data, status=data.get("status", "KO"))
             except Exception as e:
                 print(f"⚠️  Mensaje no válido recibido: {e}")
                 continue
@@ -229,7 +226,7 @@ def procesar_solicitud_engine(data, gestor: EV_Central):
         status = "approved" if gestor.can_supply(correlation_id) else "denied"
 
         response = {
-            "type": "supply_request_response",
+            "type": "engine_supply_response",
             "engine_id": engine_id,
             "correlation_id": correlation_id,
             "status": status,
@@ -252,14 +249,16 @@ def procesar_solicitud_driver(data, gestor: EV_Central):
     if gestor.can_supply(engine_id):
         print(f"El CP {engine_id} está disponible. Avisando suministro...")
         msg = {
-            "type": "request_start_supply",
+            "type": "supply_request",
             "engine_id": engine_id,
             "driver_id": driver_id,
+            "cantidad_kwh": data.get("cantidad_kwh"),
             "correlation_id": correlation_id,
             "timestamp": time.time()
         }
 
-        Producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
+        PRODUCER.produce(TOPIC, json.dumps(msg).encode("utf-8"))
+        PRODUCER.flush()
     else:
         response_driver(data, status="KO")
         print(f"❌ Suministro denegado para {driver_id} en {engine_id}")
@@ -270,16 +269,17 @@ def response_driver(data, status: str = "KO"):
     correlation_id = data.get("correlation_id")
 
     response = {
-        "type": "start_supply_response",
+        "type": "start_supply",
         "status": status,
         "driver_id": driver_id,
         "engine_id": engine_id,
         "correlation_id": correlation_id,
+        "cantidad_kwh": data.get("cantidad_kwh"),
         "timestamp": time.time()
     }
 
-    Producer.produce(TOPIC, json.dumps(response).encode("utf-8"))
-    Producer.produce(TOPIC, json.dumps(response).encode("utf-8"))
+    PRODUCER.produce(TOPIC, json.dumps(response).encode("utf-8"))
+    PRODUCER.flush()
 
 # =============================================================
 # EJECUCIÓN PRINCIPAL
