@@ -77,45 +77,48 @@ class EV_Central_UI:
         self.update_ev_cp(self.gestor.charching_points)
 
     def update_ev_cp(self, charching_points):
-        self.contenedor.destroy()
-        self.contenedor = tk.Frame(self.root)
-        self.contenedor.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
+        if not hasattr(self, "frames"):
+            self.frames = {}
 
         for i, punto in enumerate(charching_points.values()):
             bg_color = colores[punto.estado.name]
 
-            frame = tk.Frame(
-                self.contenedor,
-                width=100,
-                height=50,
-                relief=tk.RAISED,
-                borderwidth=2,
-                bg=bg_color
-            )
+            if punto.id in self.frames:
+                frame, label_id, label_estado = self.frames[punto.id]
+                frame.config(bg=bg_color)
+                label_id.config(bg=bg_color, text=f"ID: {punto.id}")
+                label_estado.config(bg=bg_color, text=punto.estado.name)
+            else:
+                frame = tk.Frame(
+                    self.contenedor,
+                    width=100,
+                    height=50,
+                    relief=tk.RAISED,
+                    borderwidth=2,
+                    bg=bg_color
+                )
+                frame.grid(row=i // 4, column=i % 4, padx=10, pady=10)
+                frame.pack_propagate(False)
 
-            frame.grid(row=i // 4, column=i % 4, padx=10, pady=10)
-            # frame.grid_propagate(False)
-            frame.pack_propagate(False)
+                label_id = tk.Label(
+                    frame, 
+                    text=f"ID: {punto.id}",
+                    font=("Arial", 10, "bold"), 
+                    fg="white", 
+                    bg=bg_color
+                )
+                label_id.pack(pady=(5, 2))
 
-            label_id = tk.Label(
-                frame, 
-                text=f"ID: {punto.id}",
-                font=("Arial", 10, "bold"), 
-                fg="white", 
-                bg=bg_color
-            )
+                label_estado = tk.Label(
+                    frame, 
+                    text=punto.estado.name,
+                    font=("Arial", 9, "italic"), 
+                    fg="white", 
+                    bg=bg_color
+                )
+                label_estado.pack(pady=(3, 4))
 
-            label_id.pack(pady=(5, 2))
-
-            label_estado = tk.Label(
-                frame, 
-                text=punto.estado.name,
-                font=("Arial", 9, "italic"), 
-                fg="white", 
-                bg=bg_color
-            )
-
-            label_estado.pack(pady=(3, 4))
+                self.frames[punto.id] = (frame, label_id, label_estado)
 
         self.root.update_idletasks()
 
@@ -166,7 +169,11 @@ def handle_client(client_socket, gestor: EV_Central):
 # =============================================================
 BROKER_HOST = "localhost"
 BROKER_PORT = 9092
-TOPIC = "central-cp"
+
+TOPIC = "central-request"
+_INPUT_TOPIC = "central-request"
+_OUTPUT_ENGINE_TOPIC = "engine-response"
+_OUTPUT_DRIVER_TOPIC = "driver-response"
 
 def crear_consumidor():
     conf = {
@@ -217,13 +224,13 @@ def procesar_solicitud_engine(data, gestor: EV_Central):
         engine_id = data.get("engine_id")
         correlation_id = data.get("correlation_id")
 
-        print(f"📥 Solicitud recibida de {engine_id} (ID {correlation_id}-000)")
+        print(f"📥 Solicitud recibida de {engine_id} (ID {correlation_id})")
 
-        print(gestor.charching_points[id].estado)
         status = "approved" if gestor.can_supply(correlation_id) else "denied"
 
         response = {
             "type": "supply_request_response",
+            "engine_id": engine_id,
             "correlation_id": correlation_id,
             "status": status,
             "timestamp": time.time()
@@ -271,6 +278,7 @@ def response_driver(data, status: str = "KO"):
         "timestamp": time.time()
     }
 
+    Producer.produce(TOPIC, json.dumps(response).encode("utf-8"))
     Producer.produce(TOPIC, json.dumps(response).encode("utf-8"))
 
 # =============================================================

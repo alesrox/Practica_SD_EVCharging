@@ -35,6 +35,7 @@ class Monitor:
             "ubicacion": self.ubicacion
         }
 
+        print(f"[{self.cp_id}] Autenticando Charging Point...")
         self._send(mensaje)
 
     def _check_engine(self) -> str:
@@ -59,6 +60,8 @@ class Monitor:
                 "id": self.cp_id,
                 "status": msg
             }
+            
+            print(f"[{self.cp_id}] Enviando estado: {msg}")
             self._send(mensaje)
             time.sleep(intervalo) # * (3 if msg == "KO" else 1)
 

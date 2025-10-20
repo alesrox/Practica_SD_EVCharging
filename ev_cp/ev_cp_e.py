@@ -9,7 +9,9 @@ from tkinter import messagebox
 
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 
-TOPIC = "central-cp"
+TOPIC = "central-request"
+_INPUT_TOPIC = "engine-response"
+_OUTPUT_TOPIC = "central-request"
 
 class Engine:
     def __init__(self, id, broker_host="localhost", broker_port=9092, port=5002):
@@ -26,7 +28,7 @@ class Engine:
 
         self.consumer = Consumer({
             'bootstrap.servers': f"{broker_host}:{broker_port}",
-            'group.id': 'central-service',
+            'group.id': f'engine-service-{self.id}',
             'auto.offset.reset': 'earliest'
         })
         self.consumer.subscribe([TOPIC])
@@ -64,18 +66,19 @@ class Engine:
                     continue
                 try:
                     data = json.loads(msg.value().decode("utf-8"))
-                    if data.get("type") == "request_start_supply_response":
-                        msg = {
-                            "type": "request_start_supply",
-                            "engine_id": data.get("engine_id"),
-                            "driver_id": data.get("driver_id"),
-                            "correlation_id": data.get("correlation_id"),
-                            "timestamp": time.time()
-                        }
+                    if data.get("engine_id") == self.id:
+                        if data.get("type") == "request_start_supply_response":
+                            msg = {
+                                "type": "request_start_supply",
+                                "engine_id": data.get("engine_id"),
+                                "driver_id": data.get("driver_id"),
+                                "correlation_id": data.get("correlation_id"),
+                                "timestamp": time.time()
+                            }
 
-                        self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
-                    elif data.get("type") == "supply_request_response":
-                        pass
+                            self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
+                        elif data.get("type") == "supply_request_response":
+                            print(f"💬 Respuesta recibida: {data.get('status')}")
                 except Exception as e:
                     print(f"⚠️  Mensaje no válido recibido: {e}")
                     continue
@@ -83,31 +86,9 @@ class Engine:
             print(f"❌ Error en el consumidor Kafka: {e}")
         finally:
             self.consumer.close()
-
-    # TODO: Revisar
+    
     def solicitar_suministro(self):
-        request_topic = "central-cp"
-        response_topic = "central-cp"
         correlation_id = str(self.id)
-
-        print(f"🛰️  Enviando solicitud de suministro con ID {correlation_id}")
-        self._enviar_solicitud_kafka(request_topic, correlation_id)
-
-        print(f"⌛ Esperando respuesta en topic '{response_topic}'...")
-        status = self._esperar_respuesta_kafka(response_topic, correlation_id)
-
-        if status:
-            print(f"💬 Respuesta recibida: {status}")
-        else:
-            print("⏰ No se recibió respuesta del servidor en el tiempo esperado.")
-
-        return status
-
-    def _enviar_solicitud_kafka(self, topic, correlation_id):
-        producer_conf = {
-            'bootstrap.servers': f"{self.broker_host}:{self.broker_port}"
-        }
-        producer = Producer(producer_conf)
 
         mensaje = {
             "type": "supply_request_engine",
@@ -116,49 +97,11 @@ class Engine:
             "timestamp": time.time(),
             "correlation_id": correlation_id
         }
+        
+        self.producer.produce(TOPIC, json.dumps(mensaje).encode("utf-8"))
+        self.producer.flush()
+        print(f"📤 Solicitud enviada al topic '{TOPIC}'")
 
-        try:
-            producer.produce(topic, json.dumps(mensaje).encode("utf-8"))
-            producer.flush()
-            print(f"📤 Solicitud enviada al topic '{topic}'")
-        except Exception as e:
-            print(f"❌ Error enviando mensaje Kafka: {e}")
-
-    def _esperar_respuesta_kafka(self, topic, correlation_id, timeout=10):
-        consumer_conf = {
-            'bootstrap.servers': f"{self.broker_host}:{self.broker_port}",
-            'group.id': f'engine-{self.id}',
-            'auto.offset.reset': 'earliest'
-        }
-        consumer = Consumer(consumer_conf)
-        consumer.subscribe([topic])
-
-        start_time = time.time()
-        status = None
-
-        try:
-            while time.time() - start_time < timeout:
-                msg = consumer.poll(1.0)
-                if msg is None:
-                    continue
-                if msg.error():
-                    if msg.error().code() != KafkaError._PARTITION_EOF:
-                        raise KafkaException(msg.error())
-                    continue
-
-                try:
-                    data = json.loads(msg.value().decode("utf-8"))
-                    if data.get("correlation_id") == correlation_id:
-                        status = data.get("status", "unknown")
-                        break
-                except json.JSONDecodeError:
-                    continue
-        except Exception as e:
-            print(f"❌ Error recibiendo respuesta Kafka: {e}")
-        finally:
-            consumer.close()
-
-        return status
 
 def start_ui(engine: Engine):
     def toggle_ko():
@@ -166,8 +109,7 @@ def start_ui(engine: Engine):
         ko_button.config(text=f"KO Mode: {'ON' if engine.ko_mode else 'OFF'}")
 
     def solicitar_suministro_ui():
-        status = engine.solicitar_suministro()
-        messagebox.showinfo("Suministro", f"Respuesta del servidor: {status}")
+        engine.solicitar_suministro()
 
     root = tk.Tk()
     root.title(f"Engine {engine.id}")
@@ -198,4 +140,5 @@ if __name__ == "__main__":
     
     #engine.start()
     threading.Thread(target=engine.start, args=(), daemon=True).start()
+    threading.Thread(target=engine.kafka_listener, args=(), daemon=True).start()
     start_ui(engine)
