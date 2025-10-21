@@ -19,7 +19,7 @@ class Kafka_Handler:
         }
         consumer = Consumer(conf)
         consumer.subscribe([self.topic])
-        print(f"[KAFKA-CONSUMER] Escuchando solicitudes en topic '{self.topic}'...")
+        print(f"[KAFKA] Escuchando solicitudes en topic '{self.topic}'...")
         return consumer
 
     def _crear_productor(self):
@@ -54,11 +54,11 @@ class Kafka_Handler:
                     elif msg_type == "supply_info":
                         self.gestor.suministrando(data)
                     elif msg_type == "end_supply":
-                        pass # TODO
+                        self.gestor.finalizar_suministro(data)
                 except Exception as e:
-                    print(f"[KAFKA-CONSUMER] Mensaje no válido recibido: {e}")
+                    print(f"[KAFKA] Mensaje no válido recibido: {e}")
         except Exception as e:
-            print(f"[KAFKA-CONSUMER] Error en el consumidor Kafka: {e}")
+            print(f"[KAFKA] Error en el consumidor Kafka: {e}")
         finally:
             self.consumer.close()
 
@@ -67,7 +67,7 @@ class Kafka_Handler:
             engine_id = data.get("engine_id")
             correlation_id = data.get("correlation_id")
 
-            print(f"[ENGINE] Solicitud recibida de {engine_id} (ID {correlation_id})")
+            print(f"[INFO] Solicitud recibida de {engine_id} (ID {correlation_id})")
 
             status = "approved" if self.gestor.can_supply(engine_id) else "denied"
 
@@ -82,18 +82,18 @@ class Kafka_Handler:
             self.producer.produce(self.topic, json.dumps(response).encode("utf-8"))
             self.producer.flush()
 
-            print(f"[CENTRAL] Respuesta enviada a '{self.topic}': {status}")
+            print(f"[INFO] Respuesta enviada a '{self.topic}': {status}")
         except Exception as e:
-            print(f"[CENTRAL] Error procesando solicitud: {e}")
+            print(f"[INFO] Error procesando solicitud: {e}")
 
     def _procesar_solicitud_driver(self, data):
         driver_id = data.get("driver_id")
         engine_id = data.get("engine_id")
         correlation_id = data.get("correlation_id")
 
-        print(f"[DRIVER] Solicitud de {driver_id} para usar en {engine_id} (ID {correlation_id})")
+        print(f"[INFO] Solicitud de {driver_id} para usar en {engine_id} (ID {correlation_id})")
         if self.gestor.can_supply(engine_id):
-            print(f"[CENTRAL] El CP {engine_id} está Operativo. Comprobando disponibilidad...")
+            print(f"[INFO] El CP {engine_id} está Operativo. Comprobando disponibilidad...")
             msg = {
                 "type": "supply_request",
                 "engine_id": engine_id,
@@ -106,7 +106,7 @@ class Kafka_Handler:
             self.producer.flush()
         else:
             self._response_driver(data, status="KO")
-            print(f"[CENTRAL] Suministro denegado para {driver_id} en {engine_id}")
+            print(f"[INFO] Suministro denegado para {driver_id} en {engine_id}")
 
     def _response_driver(self, data, status="KO"):
         engine_id = data.get("engine_id")
@@ -114,7 +114,7 @@ class Kafka_Handler:
         correlation_id = data.get("correlation_id")
 
         msg_text = "denegada" if status == "KO" else "aceptada"
-        print(f"[ENGINE] Solicitud de {engine_id} por {driver_id}: {msg_text}")
+        print(f"[INFO] Solicitud de {engine_id} por {driver_id}: {msg_text}")
 
         response = {
             "type": "start_supply",

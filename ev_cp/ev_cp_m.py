@@ -106,8 +106,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("id", help="ID del Charging Point")
-    parser.add_argument("--location", default="Zone0", help="Ubicación del CP")
-    parser.add_argument("--price", type=float, default=0.6, help="Precio por kWh")
     parser.add_argument("--central-host", default="localhost", help="IP de la central")
     parser.add_argument("--central-port", type=int, default=5001, help="Puerto de la central")
     parser.add_argument("--engine-host", default="localhost", help="IP del engine")

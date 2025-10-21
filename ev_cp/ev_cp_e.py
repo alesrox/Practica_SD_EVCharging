@@ -86,10 +86,10 @@ class Engine:
                     continue
                 try:
                     data = json.loads(msg.value().decode("utf-8"))
-                    if data.get("engine_id") == self.id:
+                    if data.get("engine_id") == self.id and not self.ko_mode:
                         if data.get("type") == "engine_supply_response":
                             status = data.get('status')
-                            print(f"[CENTRAL] Respuesta recibida: {status}")
+                            print(f"[INFO] Respuesta recibida: {status}")
                             if status == "approved": self.can_supply = True
                         elif data.get("type") == "supply_request":
                             self.supply_request(data)
@@ -97,17 +97,18 @@ class Engine:
                             self.driver = data.get("driver_id")
                             self.can_supply = True
                 except Exception as e:
-                    print(f"[KAFKA-CONSUMER] Mensaje no válido recibido: {e}")
+                    print(f"[KAFKA] Mensaje no válido recibido: {e}")
                     continue
         except Exception as e:
-            print(f"[KAFKA-CONSUMER] Error en el consumidor Kafka: {e}")
+            print(f"[KAFKA] Error en el consumidor Kafka: {e}")
         finally:
             self.consumer.close()
 
     def supply_request(self, data):
         c_id = data.get("correlation_id")
         driver_id = data.get('driver_id')
-        print(f"[CENRAL] Solicitud ({c_id}) de suministro para {driver_id}")
+        print(f"[INFO] Solicitud ({c_id}) de suministro para {driver_id}")
+        msg = 'denegada' if self.can_supply else 'aceptada'
 
         response = {
             "type": "supply_response",
@@ -119,27 +120,27 @@ class Engine:
         } 
 
         self.can_supply = True
+        print(f"[INFO] Solicitud ({c_id}): {msg}")
+
         self.producer.produce(TOPIC, json.dumps(response).encode("utf-8"))
         self.producer.flush()
 
-        msg = 'denegada' if self.can_supply else 'aceptada'
-        print(f"[ENGINE] Solicitud ({c_id}): {msg}")
-
     def suministrar(self):
+        self.kwh = 0
         if not self.can_supply:
             print("[INFO] No se puede iniciar el suministro, no autorizado.")
             return
 
         if self.status == "SUMINISTRANDO":
-            print("[INFO] Ya se esta suministrando")
+            print("[INFO] Ya se esta suministrando.")
             return
 
-        if not self.driver: pass
 
         self.status = "SUMINISTRANDO"
         print("[INFO] SUMINISTRANDO...")
         self.supply_msg("init_supply")
         while self.can_supply:
+            if self.ko_mode: return
             self.kwh += random.choice([x * 0.5 for x in range(16, 23)])
 
             msg = {
@@ -147,7 +148,7 @@ class Engine:
                 "engine_id": self.id,
                 "driver_id": self.driver,
                 "correlation_id": str(uuid.uuid4()),
-                "kWh": self.kwh,
+                "consumo": self.kwh,
                 "timestamp": time.time()
             }
 
@@ -158,18 +159,20 @@ class Engine:
             time.sleep(2)
 
         self.supply_msg("end_supply")
+        print(f"[INFO] FINALIZADO (Total: {self.kwh} kWh)")
+
         self.status = "ACTIVADO"
         self.driver = None
-        self.kwh = 0
-        print("[INFO] FINALIZADO")
 
     def supply_msg(self, msg_id: str = "init_supply"):
         msg = {
             "type": msg_id,
             "engine_id": self.id,
             "driver_id": self.driver,
+            "consumo": self.kwh,
             "timestamp": time.time()
         } 
+
         self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
         self.producer.flush()
 
@@ -188,7 +191,7 @@ class Engine:
         
         self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
         self.producer.flush()
-        print(f"[ENGINE] Solicitud enviada al topic '{TOPIC}'")
+        print(f"[INFO] Solicitud enviada al topic '{TOPIC}'")
 
 def engine_ui(engine: Engine):
     def toggle_ko():

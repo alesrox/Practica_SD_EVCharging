@@ -22,7 +22,7 @@ class DataBase:
         conn.commit()
         conn.close()
 
-    def save_charching_points(self, punto: EV_CP):
+    def save_charging_points(self, punto: EV_CP):
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
         cursor.execute(
@@ -32,7 +32,7 @@ class DataBase:
         conn.commit()
         conn.close()
 
-    def load_charching_points(self) -> Dict[str, EV_CP]:
+    def load_charging_points(self) -> Dict[str, EV_CP]:
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
         cursor.execute("SELECT id, location, price FROM puntos_carga")
