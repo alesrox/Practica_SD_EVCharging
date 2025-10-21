@@ -15,7 +15,8 @@ class DataBase:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS puntos_carga (
                 id TEXT PRIMARY KEY,
-                ubicacion TEXT NOT NULL
+                location TEXT NOT NULL,
+                price FLOAT NOT NULL
             )
         """)
         conn.commit()
@@ -25,8 +26,8 @@ class DataBase:
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT OR IGNORE INTO puntos_carga (id, ubicacion) VALUES (?, ?)",
-            (punto.id, punto.ubicacion)
+            "INSERT OR IGNORE INTO puntos_carga (id, location, price) VALUES (?, ?, ?)",
+            (punto.id, punto.location, punto.price)
         )
         conn.commit()
         conn.close()
@@ -34,10 +35,10 @@ class DataBase:
     def load_charching_points(self) -> Dict[str, EV_CP]:
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
-        cursor.execute("SELECT id, ubicacion FROM puntos_carga")
+        cursor.execute("SELECT id, location, price FROM puntos_carga")
         rows = cursor.fetchall()
         conn.close()
         puntos = {}
         for row in rows:
-            puntos[row[0]] = EV_CP(row[0], row[1], estado=EstadoCP.DESCONECTADO)
+            puntos[row[0]] = EV_CP(row[0], row[1], row[2], estado=EstadoCP.DESCONECTADO)
         return puntos
