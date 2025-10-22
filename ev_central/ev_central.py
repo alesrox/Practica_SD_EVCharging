@@ -46,13 +46,14 @@ class EV_Central:
             cond_av = nuevo_estado == EstadoCP.AVERIADO
             cond_su = self.charging_points[id].estado == EstadoCP.SUMINISTRANDO
             if cond_av and cond_su:
-                restored_data = {
-                    "engine_id": id,
-                    "driver_id": self.charging_points[id].driver,
-                    "consumo": self.charging_points[id].kwh
-                }
+                print(f"[ERROR] {id} ha caído mientras suministraba")
+            #     restored_data = {
+            #         "engine_id": id,
+            #         "driver_id": self.charging_points[id].driver,
+            #         "consumo": self.charging_points[id].kwh
+            #     }
 
-                self.finalizar_suministro(restored_data, True)
+            #     self.finalizar_suministro(restored_data, True)
 
             self.charging_points[id].estado = nuevo_estado
             gestor.last_msg[id] = time.time()
@@ -77,13 +78,13 @@ class EV_Central:
 
     def finalizar_suministro(self, data, error=False):
         cp_id = data.get("engine_id")
-        driver_id = data.get("driver_id")
+        # driver_id = data.get("driver_id")
         kwh = data.get("consumo")
         price = self.charging_points[cp_id].price
 
         error_msg = "debido a una averia" if error else ""
-        print(f"[INFO] {cp_id} ha finalizado {error_msg}")
-        print(f"[INFO] Total Factura: {cp_id}-{driver_id}: {round(kwh * price, 2)}€")
+        ticket = round(kwh * price, 2)
+        print(f"[INFO] {cp_id} ha finalizado {error_msg} ({kwh} kWh): {ticket}€")
 
 if __name__ == "__main__":
     gestor = EV_Central()

@@ -105,7 +105,7 @@ class Engine:
             self.consumer.close()
 
     def supply_request(self, data):
-        c_id = data.get("correlation_id")
+        c_id = data.get("id")
         driver_id = data.get('driver_id')
         print(f"[INFO] Solicitud ({c_id}) de suministro para {driver_id}")
         msg = 'denegada' if self.can_supply else 'aceptada'
@@ -114,7 +114,7 @@ class Engine:
             "type": "supply_response",
             "engine_id": data.get("engine_id"),
             "driver_id": driver_id,
-            "correlation_id": c_id,
+            "id": c_id,
             "status": "OK" if not self.can_supply else "KO",
             "timestamp": time.time()
         } 
@@ -140,14 +140,14 @@ class Engine:
         print("[INFO] SUMINISTRANDO...")
         self.supply_msg("init_supply")
         while self.can_supply:
-            if self.ko_mode: return
+            while self.ko_mode: time.sleep(1)
             self.kwh += random.choice([x * 0.5 for x in range(16, 23)])
 
             msg = {
                 "type": "supply_info",
                 "engine_id": self.id,
                 "driver_id": self.driver,
-                "correlation_id": str(uuid.uuid4()),
+                "id": str(uuid.uuid4()),
                 "consumo": self.kwh,
                 "timestamp": time.time()
             }
@@ -179,14 +179,14 @@ class Engine:
     def solicitar_suministro(self):
         if self.can_supply: return
 
-        correlation_id = str(uuid.uuid4())
+        id = str(uuid.uuid4())
 
         msg = {
             "type": "engine_supply_request",
             "engine_id": self.id,
             "from": "ev_engine",
             "timestamp": time.time(),
-            "correlation_id": correlation_id
+            "id": id
         }
         
         self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
