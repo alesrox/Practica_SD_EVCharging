@@ -1,6 +1,7 @@
 import json
 import time
 from charging_point import EstadoCP
+from concurrent.futures import ThreadPoolExecutor
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 
 class Kafka_Handler:
@@ -29,24 +30,25 @@ class Kafka_Handler:
         return producer
 
     def start_listener(self):
-        try:
-            while True:
-                msg = self.consumer.poll(1.0)
-                if msg is None:
-                    continue
-                if msg.error():
-                    if msg.error().code() != KafkaError._PARTITION_EOF:
-                        raise KafkaException(msg.error())
-                    continue
-                try:
-                    data = json.loads(msg.value().decode("utf-8"))
-                    self.procesar_msg(data)
-                except Exception as e:
-                    print(f"[KAFKA] Mensaje no válido recibido: {e}")
-        except Exception as e:
-            print(f"[KAFKA] Error en el consumidor Kafka: {e}")
-        finally:
-            self.consumer.close()
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            try:
+                while True:
+                    msg = self.consumer.poll(1.0)
+                    if msg is None:
+                        continue
+                    if msg.error():
+                        if msg.error().code() != KafkaError._PARTITION_EOF:
+                            raise KafkaException(msg.error())
+                        continue
+                    try:
+                        data = json.loads(msg.value().decode("utf-8"))
+                        executor.submit(self.procesar_msg, data)
+                    except Exception as e:
+                        print(f"[KAFKA] Mensaje no válido recibido: {e}")
+            except Exception as e:
+                print(f"[KAFKA] Error en el consumidor Kafka: {e}")
+            finally:
+                self.consumer.close()
 
     def procesar_msg(self, data):
         msg_type = data.get("type")
@@ -136,7 +138,7 @@ class Kafka_Handler:
         self.producer.flush()
 
     def _share_cp(self, data):
-        print("[INFO] 1")
+        # print("[INFO] 1")
         for_share_cp = [
             cp_id for cp_id, punto in self.gestor.charging_points.items()
             if punto.estado == EstadoCP.ACTIVADO

@@ -66,7 +66,7 @@ class Monitor:
 
                             print("[INFO] Engine Status: OK")
                             return response["status"]
-                    except json.JSONDecodeError:
+                    except Exception:
                         continue
 
         except (ConnectionRefusedError, socket.timeout):
