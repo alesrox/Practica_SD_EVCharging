@@ -35,20 +35,8 @@ class Driver:
         t.start()
         
         # al iniciar, pedir CP una vez y entrar en la interfaz principal
-        try:
-            self.ask_for_cp()
-            self.main()
-        except KeyboardInterrupt:
-            print("\n[INFO] Saliendo...")
-            self.stop()
-            t.join(timeout=2)
-
-    def stop(self):
-        self._stop.set()
-        try:
-            self.consumer.close()
-        except Exception:
-            pass
+        self.ask_for_cp()
+        self.main()
 
     def kafka_listener(self):
         with ThreadPoolExecutor(max_workers=4) as executor:
@@ -186,18 +174,15 @@ class Driver:
             print(f"  - CP: {cp_id}")
 
     def main(self):
-        try:
-            while not self._stop.is_set():
-                cmd = input("\nIntroduce CP (id), 'r' reintentar, 'q' salir: ").strip()
-                if cmd == "q":
-                    self.stop()
-                    break
-                elif cmd == "r":
-                    self.ask_for_cp()
-                elif cmd:
-                    self.solicitar_carga(cmd)
-        except KeyboardInterrupt:
-            self.stop()
+        while not self._stop.is_set():
+            cmd = input("\nIntroduce CP (id), 'r' reintentar, 'q' salir: ").strip()
+            if cmd == "q":
+                exit()
+                break
+            elif cmd == "r":
+                self.ask_for_cp()
+            elif cmd:
+                self.solicitar_carga(cmd)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_DRIVER")

@@ -122,8 +122,7 @@ class Kafka_Handler:
         driver_id = data.get("driver_id")
         id = data.get("id")
 
-        msg_text = "denegada" if status == "KO" else "aceptada"
-        print(f"[INFO] Solicitud de {engine_id} por {driver_id}: {msg_text}")
+        print(f"[INFO] Solicitud de {engine_id} por {driver_id}: {status}")
 
         response = {
             "type": "start_supply",
