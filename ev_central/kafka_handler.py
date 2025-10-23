@@ -104,18 +104,29 @@ class Kafka_Handler:
         if self.gestor.can_supply(engine_id):
             print(f"[INFO] El CP {engine_id} está Operativo. Comprobando disponibilidad...")
             msg = {
+                "id": id,
                 "type": "supply_request",
+                "status": "aceptada",
                 "engine_id": engine_id,
                 "driver_id": driver_id,
-                "id": id,
                 "timestamp": time.time()
             }
 
-            self.producer.produce(self.topic, json.dumps(msg).encode("utf-8"))
-            self.producer.flush()
         else:
-            self._response_driver(data, status="KO")
             print(f"[INFO] Suministro denegado para {driver_id} en {engine_id}")
+
+            msg = {
+                "id": id,
+                "type": "start_supply",
+                "status": "denegada",
+                "driver_id": driver_id,
+                "engine_id": engine_id,
+                "timestamp": time.time()
+            }
+        
+        self.producer.produce(self.topic, json.dumps(msg).encode("utf-8"))
+        self.producer.flush()
+
 
     def _response_driver(self, data, status="KO"):
         engine_id = data.get("engine_id")
@@ -137,7 +148,9 @@ class Kafka_Handler:
         self.producer.flush()
 
     def _share_cp(self, data):
-        # print("[INFO] 1")
+        req_id = data.get("id")
+        driver_id = data.get("driver_id")
+        print(f"[INFO] Solicitud de CP por {driver_id} ({req_id})")
         for_share_cp = [
             cp_id for cp_id, punto in self.gestor.charging_points.items()
             if punto.estado == EstadoCP.ACTIVADO
@@ -145,11 +158,12 @@ class Kafka_Handler:
 
         response = {
             "type": "driver_cp_info_resposne",
-            "driver_id": data.get("driver_id"),
-            "id": data.get("id"),
+            "driver_id": driver_id,
+            "id": req_id,
             "info": for_share_cp,
             "timestamp": time.time(),
         }
 
         self.producer.produce(self.topic, json.dumps(response).encode("utf-8"))
         self.producer.flush()
+        print(f"[INFO] Enviando CPs disponibles a {driver_id} ({req_id})")

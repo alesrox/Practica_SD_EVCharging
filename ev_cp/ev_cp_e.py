@@ -146,7 +146,7 @@ class Engine:
     def supply_request(self, data):
         c_id = data.get("id")
         driver_id = data.get('driver_id')
-        print(f"[INFO] Solicitud ({c_id}) de suministro para {driver_id}")
+        print(f"[INFO] Solicitud de suministro para {driver_id} ({c_id})")
 
         accepted = not self.can_supply
         status = "aceptada" if accepted else "denegada"
@@ -161,7 +161,7 @@ class Engine:
         }
 
         if accepted: self.can_supply = True
-        print(f"[INFO] Solicitud ({c_id}): {status}")
+        print(f"[INFO] Solicitud: {status} ({c_id})")
 
         try:
             self.producer.produce(TOPIC, json.dumps(response).encode("utf-8"))
