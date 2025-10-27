@@ -15,7 +15,7 @@ TOPIC = "central-request"
 class Engine:
     def __init__(
         self, id: str, location: str = "Zone 0", price: float = 0.6,
-        broker_host: str = "0.0.0.0", broker_port: int = 9092,
+        broker_host: str = "localhost", broker_port: int = 9092,
         port: int = 5002,
     ):
         self.id = id

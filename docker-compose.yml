@@ -16,11 +16,3 @@ services:
             KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
             KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
             KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-
-    topic-creator:
-        build:
-            context: .
-            dockerfile: Dockerfile
-        container_name: topic-creator
-        depends_on:
-            - broker

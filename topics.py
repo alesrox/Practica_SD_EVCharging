@@ -1,15 +1,34 @@
+import time
 from confluent_kafka.admin import AdminClient, NewTopic
 
-admin = AdminClient({'bootstrap.servers': 'broker:29092'})
+# Ajusta la dirección del broker según tu Docker Compose
+BROKER = 'localhost:9092'
 
-topic0 = NewTopic("central-request", num_partitions=3, replication_factor=1)
-topic1 = NewTopic("engine-response", num_partitions=3, replication_factor=1)
-topic2 = NewTopic("driver-response", num_partitions=3, replication_factor=1)
-fs = admin.create_topics([topic0, topic1, topic2])
+# Esperar a que Kafka esté disponible
+while True:
+    try:
+        admin = AdminClient({'bootstrap.servers': BROKER})
+        admin.list_topics(timeout=5)  # Solo para probar conexión
+        print("Kafka disponible")
+        break
+    except Exception:
+        print("Esperando a Kafka...")
+        time.sleep(2)
 
+# Definir topics
+topics = [
+    NewTopic("central-request", num_partitions=3, replication_factor=1),
+    NewTopic("engine-response", num_partitions=3, replication_factor=1),
+    NewTopic("driver-response", num_partitions=3, replication_factor=1)
+]
+
+# Crear topics
+fs = admin.create_topics(topics)
+
+# Imprimir resultados
 for topic, f in fs.items():
     try:
-        f.result()
+        f.result()  # Espera a que la creación termine
         print(f"Tópico {topic} creado")
     except Exception as e:
         print(f"Tópico {topic} ya existe o error: {e}")
