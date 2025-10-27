@@ -6,8 +6,8 @@ import argparse
 class Monitor:
     def __init__(
         self, id: str,
-        central_host="0.0.0.0", central_port=5001,
-        engine_host="0.0.0.0", engine_port=5002
+        central_host="localhost", central_port=5001,
+        engine_host="localhost", engine_port=5002
     ):
         self.id = id
         self.location = None
