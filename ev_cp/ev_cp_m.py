@@ -106,9 +106,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("id", help="ID del Charging Point")
-    parser.add_argument("--central-host", default="0.0.0.0", help="IP de la central")
+    parser.add_argument("--central-host", default="localhost", help="IP de la central")
     parser.add_argument("--central-port", type=int, default=5001, help="Puerto de la central")
-    parser.add_argument("--engine-host", default="0.0.0.0", help="IP del engine")
+    parser.add_argument("--engine-host", default="localhost", help="IP del engine")
     parser.add_argument("--engine-port", type=int, default=5002, help="Puerto del engine")
 
     args = parser.parse_args()

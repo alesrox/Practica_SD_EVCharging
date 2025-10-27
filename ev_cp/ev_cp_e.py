@@ -8,7 +8,7 @@ import threading
 import tkinter as tk
 
 from concurrent.futures import ThreadPoolExecutor
-from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
+from confluent_kafka import Producer, Consumer, KafkaError
 
 TOPIC = "central-request"
 
