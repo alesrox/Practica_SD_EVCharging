@@ -39,7 +39,7 @@ class Engine:
         self.consumer = Consumer({
             'bootstrap.servers': f"{broker_host}:{broker_port}",
             'group.id': f'engine-service-{self.id}',
-            'auto.offset.reset': 'earliest',
+            'auto.offset.reset': 'latest',
             'enable.auto.commit': True
         })
 
@@ -148,7 +148,8 @@ class Engine:
         driver_id = data.get('driver_id')
         print(f"[INFO] Solicitud de suministro para {driver_id} ({c_id})")
 
-        accepted = not self.can_supply
+        _aux = self.can_supply and self.driver != driver_id
+        accepted = not _aux
         status = "aceptada" if accepted else "denegada"
 
         response = {

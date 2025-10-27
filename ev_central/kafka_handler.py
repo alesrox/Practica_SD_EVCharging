@@ -17,7 +17,8 @@ class Kafka_Handler:
         conf = {
             'bootstrap.servers': self.broker,
             'group.id': 'central-service',
-            'auto.offset.reset': 'earliest'
+            'auto.offset.reset': 'latest',
+            'enable.auto.commit': True
         }
         consumer = Consumer(conf)
         consumer.subscribe([self.topic])

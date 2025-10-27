@@ -25,7 +25,7 @@ class Driver:
         self.consumer = Consumer({
             'bootstrap.servers': f"{broker_host}:{broker_port}",
             'group.id': f'driver-service-{self.id}',
-            'auto.offset.reset': 'earliest',
+            'auto.offset.reset': 'latest',
             'enable.auto.commit': True
         })
         self.consumer.subscribe([TOPIC])
@@ -57,28 +57,27 @@ class Driver:
         if data.get("driver_id") != self.id: return
         t = data.get("type")
 
-        check_id = data.get("id") in self.unresponsed["driver_supply_request"]
+        check_id = data.get("id") in self.unresponsed["driver_cp_info"]
         if t == "driver_cp_info_resposne" and check_id:
-                self.unresponsed["driver_supply_request"].clear()
+                self.unresponsed["driver_cp_info"].clear()
                 self.waiting = True
                 self.show_cp(data)
 
         if not self.waiting: return
 
-        if t == "supply_request" and data.get("id") in self.unresponsed["driver_cp_info"]:
+        if t == "supply_request" and data.get("id") in self.unresponsed["driver_supply_request"]:
             self.unresponsed["driver_supply_request"].clear()
             if data.get("status") == "aceptada":
                 print(f"[INFO] Surtidor {data.get('engine_id')} disponible para suministro.")
             else:
                 print(f"[INFO] Suministro con {data.get('engine_id')}: solicitud denegada")
-
         elif t == "start_supply":
             engine_id = data.get("engine_id")
             if data.get("status") == "aceptada":
                 print(f"[INFO] Suministro con {engine_id} iniciado: ya puede enchufar el vehículo.")
             else:
                 print(f"[INFO] Suministro con {engine_id}: solicitud denegada")
-                # self.ask_for_cp()
+                self.ask_for_cp()
         elif t == "init_supply":
             cp_id = data.get("engine_id")
             print(f"[INFO] {cp_id} ha empezado a suministrar")
@@ -87,16 +86,17 @@ class Driver:
             print(f"[INFO] Consumo: {kwh}")
         elif t == "end_supply":
             print("[INFO] Fin de suministro.")
-            # self.ask_for_cp()
+            self.ask_for_cp()
     
     def start(self):
         threading.Thread(target=self.kafka_listener, daemon=True).start()
         self.ask_for_cp()
+        time.sleep(10)
         while not self.exit: # Bucle principal
-            time.sleep(10)
             if self.unresponsed["driver_cp_info"]:
                 print("[ERROR] Tiempo de espera agotado (1)")
                 self.ask_for_cp()
+            time.sleep(10)
 
     def solicitar_carga(self, cp_id: str):
         print(f"[INFO] Solicitando carga con {cp_id}")
@@ -144,10 +144,11 @@ class Driver:
             self.ask_for_cp()
         elif cmd:
             self.solicitar_carga(cmd)
+            time.sleep(5)
             while self.unresponsed["driver_supply_request"] != []:
-                time.sleep(5)
                 print("[ERROR] Tiempo de espera agotado (2)")
                 self.solicitar_carga(cmd)
+                time.sleep(5)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_DRIVER")
