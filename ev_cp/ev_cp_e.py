@@ -37,13 +37,13 @@ class Engine:
         self.status: str = "ACTIVADO"
 
         self.consumer = Consumer({
-            'bootstrap.servers': f"{broker_host}:{broker_port}",
+            'bootstrap.servers': f"{self.broker_host}:{self.broker_port}",
             'group.id': f'engine-service-{self.id}',
             'auto.offset.reset': 'latest',
             'enable.auto.commit': True
         })
 
-        self.producer = Producer({'bootstrap.servers': f"{broker_host}:{broker_port}"})
+        self.producer = Producer({'bootstrap.servers': f"{self.broker_host}:{self.broker_port}"})
 
     def start(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -322,6 +322,8 @@ if __name__ == "__main__":
     parser.add_argument("--broker-port", type=int, default=9092, help="Puerto de la central")
     parser.add_argument("--port", type=int, default=5002, help="Puerto de escucha del Engine")
     args = parser.parse_args()
+
+    print(args.broker_host)
 
     engine = Engine(
         id=args.id, port=args.port,
