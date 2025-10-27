@@ -9,7 +9,7 @@ from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 TOPIC = "central-request"
 
 class Driver:
-    def __init__(self, id: str, broker_host="localhost", broker_port=9092, filename=None):
+    def __init__(self, id: str, broker_host="0.0.0.0", broker_port=9092, filename=None):
         self.id = id
         self.broker_host = broker_host
         self.broker_port = broker_port
@@ -153,7 +153,7 @@ class Driver:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_DRIVER")
     parser.add_argument("id", help="ID del Driver")
-    parser.add_argument("--broker-host", default="localhost", help="IP de la central")
+    parser.add_argument("--broker-host", default="0.0.0.0", help="IP de la central")
     parser.add_argument("--broker-port", type=int, default=9092, help="Puerto de la central")
     parser.add_argument("--file", default=None, help="Fichero de operaciones")
     args = parser.parse_args()

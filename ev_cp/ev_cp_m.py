@@ -6,8 +6,8 @@ import argparse
 class Monitor:
     def __init__(
         self, id: str,
-        central_host="localhost", central_port=5001,
-        engine_host="localhost", engine_port=5002
+        central_host="0.0.0.0", central_port=5001,
+        engine_host="0.0.0.0", engine_port=5002
     ):
         self.id = id
         self.location = None
@@ -106,9 +106,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("id", help="ID del Charging Point")
-    parser.add_argument("--central-host", default="localhost", help="IP de la central")
+    parser.add_argument("--central-host", default="0.0.0.0", help="IP de la central")
     parser.add_argument("--central-port", type=int, default=5001, help="Puerto de la central")
-    parser.add_argument("--engine-host", default="localhost", help="IP del engine")
+    parser.add_argument("--engine-host", default="0.0.0.0", help="IP del engine")
     parser.add_argument("--engine-port", type=int, default=5002, help="Puerto del engine")
 
     args = parser.parse_args()

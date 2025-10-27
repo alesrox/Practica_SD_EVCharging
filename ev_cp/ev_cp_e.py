@@ -15,7 +15,7 @@ TOPIC = "central-request"
 class Engine:
     def __init__(
         self, id: str, location: str = "Zone 0", price: float = 0.6,
-        broker_host: str = "localhost", broker_port: int = 9092,
+        broker_host: str = "0.0.0.0", broker_port: int = 9092,
         port: int = 5002,
     ):
         self.id = id
@@ -318,7 +318,7 @@ def engine_ui(engine: Engine):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Engine de CP")
     parser.add_argument("id", help="ID del Charging Point")
-    parser.add_argument("--broker-host", default="localhost", help="IP de la central")
+    parser.add_argument("--broker-host", default="0.0.0.0", help="IP de la central")
     parser.add_argument("--broker-port", type=int, default=9092, help="Puerto de la central")
     parser.add_argument("--port", type=int, default=5002, help="Puerto de escucha del Engine")
     args = parser.parse_args()
