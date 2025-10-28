@@ -217,6 +217,7 @@ class Engine:
             "timestamp": time.time(),
         }
         self.send_kafka_msg(msg)
+        print("[INFO] Solicitando suministraje por interfaz")
 
 def engine_ui(engine: Engine):
     def toggle_ko():
@@ -224,8 +225,7 @@ def engine_ui(engine: Engine):
         ko_button.config(text=f"KO Mode: {'ON' if engine.ko_mode else 'OFF'}")
 
     def solicitar_suministro_ui():
-        if engine.can_supply:
-            return
+        if engine.can_supply: return
         # label_consumo.config(text="Consumo: 0.00 kWh | 0.00€")
         engine.driver = None
         engine.solicitar_suministro()

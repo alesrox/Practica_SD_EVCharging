@@ -87,10 +87,20 @@ class EV_Central:
         driver = data.get("driver")
 
         print(f"[INFO] {driver} ha solicitado recargar en {cp_id} ({id})")
-        cp = self.charging_points[cp_id]
-        msg = None
+        cp = self.charging_points.get(cp_id, None)
+        msg = {
+            "id": id,
+            "type": "start_supply",
+            "status": "denegada",
+            "driver": driver,
+            "cp": cp_id,
+            "timestamp": time.time()
+        }
 
-        if cp.can_supply():
+        
+        if not cp:
+            print(f"[INFO] {cp_id} no está registrado")
+        elif cp.can_supply():
             print(f"[INFO] El CP {cp_id} está Operativo. Comprobando disponibilidad...")
             msg = {
                 "id": id,
@@ -100,17 +110,8 @@ class EV_Central:
                 "driver": driver,
                 "timestamp": time.time()
             }
-
         else:
             print(f"[INFO] {cp_id} no disponible: Solicitud denegada ({id})")
-            msg = {
-                "id": id,
-                "type": "start_supply",
-                "status": "denegada",
-                "driver": driver,
-                "cp": cp_id,
-                "timestamp": time.time()
-            }
         
         self.kafka_handler.send_msg(msg)
 

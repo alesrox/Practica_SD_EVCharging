@@ -13,6 +13,7 @@ class Driver:
         self.id = id
         self.broker = broker
         self.filename = filename
+        self.services = []
 
         self.exit = False
         self.waiting = False
@@ -76,8 +77,7 @@ class Driver:
                 print(f"[INFO] Suministro con {cp} iniciado: ya puede enchufar el vehículo.")
             else:
                 print(f"[INFO] Suministro con {cp}: solicitud denegada")
-                time.sleep(4)
-                self.ask_for_cp()
+                self._continue()
         elif t == "init_supply":
             cp_id = data.get("cp")
             print(f"[INFO] {cp_id} ha empezado a suministrar")
@@ -89,11 +89,31 @@ class Driver:
             consumo = data.get('consumo')
             total = data.get('total')
             print(f"[TICKET] Consumo: {consumo} kWh - Total: {total}€")
-            time.sleep(4)
-            self.ask_for_cp()
+            self._continue()
     
     def start(self):
         threading.Thread(target=self.kafka_listener, daemon=True).start()
+        if self.filename:
+            self.waiting = True
+            self.cargar_lista()
+            self.file_main()
+            while not self.exit: time.sleep(1)
+        else:
+            self.manual_main()
+
+    def cargar_lista(self):
+        with open(self.filename, "r", encoding="utf-8") as f:
+            self.services = [linea.strip() for linea in f if linea.strip()]
+
+    def file_main(self):
+        if self.services:
+            service = self.services.pop(0)
+            self.solicitar_carga(service)
+        else:
+            self.exit = True
+            exit()
+
+    def manual_main(self):
         self.ask_for_cp()
         time.sleep(10)
         while not self.exit: # Bucle principal
@@ -101,6 +121,13 @@ class Driver:
                 print("[ERROR] Tiempo de espera agotado (1)")
                 self.ask_for_cp()
             time.sleep(10)
+
+    def _continue(self):
+        time.sleep(4)
+        if self.filename:
+            self.file_main()
+        else:
+            self.ask_for_cp()
 
     def solicitar_carga(self, cp_id: str):
         print(f"[INFO] Solicitando carga con {cp_id}")
