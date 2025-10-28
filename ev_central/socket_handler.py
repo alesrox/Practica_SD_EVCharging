@@ -20,42 +20,43 @@ class Socket_Handler:
 
         try:
             while True:
-                client, addr = self.server.accept()
-                threading.Thread(target=self._handle_client, args=(client,), daemon=True).start()
+                client, _ = self.server.accept()
+                threading.Thread(
+                    target=self._handle_client, args=(client,), daemon=True
+                ).start()
         except Exception as e:
             print(f"[SOCKET] Error en el listener: {e}")
         finally:
             self.server.close()
 
-    def _handle_client(self, client_socket):
-        with client_socket:
+    def _handle_client(self, client):
+        with client:
             try:
-                data = client_socket.recv(4096)
+                data = client.recv(4096)
                 if not data:
                     return
-                mensaje = json.loads(data.decode("utf-8"))
-                tipo = mensaje.get("type")
 
-                if tipo == "auth":
-                    self.gestor.registrar_punto(mensaje["id"], mensaje)
-                    msg = {
-                        "type": "auth",
-                        "id": mensaje["id"],
-                        "status": "OK",
-                    }
-                    client_socket.send(json.dumps(msg).encode("utf-8"))
-                elif tipo == "status":
-                    estado_str = mensaje.get("status", "AVERIADO")
-                    estado = EstadoCP[estado_str]
-                    self.gestor.actualizar_estado(mensaje["id"], estado)
-                    msg = {
-                        "type": "status",
-                        "id": mensaje["id"],
-                        "status": "OK",
-                    }
-                    client_socket.send(json.dumps(msg).encode("utf-8"))
+                msg = json.loads(data.decode("utf-8"))
+                msg_type = msg.get("type")
+
+                if msg_type == "auth":
+                    self._handle_auth(client, msg)
+                elif msg_type == "status":
+                    self._handle_status(client, msg)
                 else:
-                    client_socket.send(b"ERROR - unknown msg")
+                    client.send(b"ERROR - unknown msg")
+
             except Exception as e:
                 print(f"[SOCKET] Error procesando mensaje: {e}")
-                client_socket.send(b"ERROR")
+                client.send(b"ERROR")
+
+    def _handle_auth(self, client, msg):
+        self.gestor.registrar_punto(msg["id"], msg)
+        response = {"type": "auth", "id": msg["id"], "status": "OK"}
+        client.send(json.dumps(response).encode("utf-8"))
+
+    def _handle_status(self, client, msg):
+        estado = EstadoCP[msg.get("status", "AVERIADO")]
+        self.gestor.actualizar_estado(msg["id"], estado)
+        response = {"type": "status", "id": msg["id"], "status": "OK"}
+        client.send(json.dumps(response).encode("utf-8"))
