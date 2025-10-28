@@ -5,7 +5,7 @@ import threading
 from charging_point import EstadoCP
 
 class Socket_Handler:
-    def __init__(self, gestor, host="0.0.0.0", port=5001):
+    def __init__(self, gestor, host="0.0.0.0", port=6000):
         self.gestor = gestor
         self.host = host
         self.port = port

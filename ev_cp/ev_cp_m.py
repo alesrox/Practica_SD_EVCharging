@@ -6,18 +6,20 @@ import argparse
 class Monitor:
     def __init__(
         self, id: str,
-        central_host="localhost", central_port=5001,
-        engine_host="localhost", engine_port=5002
+        central="localhost:6000",
+        engine="localhost:6001",
     ):
         self.id = id
         self.location = None
         self.price = 0
 
-        self.central_host = central_host
-        self.central_port = central_port
-
-        self.engine_host = engine_host
-        self.engine_port = engine_port
+        self.central = central
+        self.central_host, self.central_port = self.central.split(":")
+        self.central_port = int(self.central_port)
+        
+        self.engine = engine
+        self.engine_host, self.engine_port = self.engine.split(":")
+        self.engine_port = int(self.engine_port)
 
     def _send(self, mensaje: dict):
         try:
@@ -106,19 +108,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("id", help="ID del Charging Point")
-    parser.add_argument("--central-host", default="localhost", help="IP de la central")
-    parser.add_argument("--central-port", type=int, default=5001, help="Puerto de la central")
-    parser.add_argument("--engine-host", default="localhost", help="IP del engine")
-    parser.add_argument("--engine-port", type=int, default=5002, help="Puerto del engine")
+    parser.add_argument("--central", default="localhost:6000", help="IP de la central")
+    parser.add_argument("--engine", default="localhost:6001", help="IP del engine")
 
     args = parser.parse_args()
 
     monitor = Monitor(
         id=args.id,
-        central_host=args.central_host,
-        central_port=args.central_port,
-        engine_host=args.engine_host,
-        engine_port=args.engine_port
+        central=args.central,
+        engine=args.engine
     )
 
     monitor.auth_cp()

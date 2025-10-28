@@ -15,15 +15,13 @@ TOPIC = "central-request"
 class Engine:
     def __init__(
         self, id: str, location: str = "Zone 0", price: float = 0.6,
-        broker_host: str = "localhost", broker_port: int = 9092,
-        port: int = 5002,
+        broker: str = "localhost:9092", port: int = 6001,
     ):
         self.id = id
         self.location = location
         self.price = price
 
-        self.broker_host = broker_host
-        self.broker_port = broker_port
+        self.broker = broker
 
         self.host = "0.0.0.0"
         self.port = port
@@ -37,13 +35,13 @@ class Engine:
         self.status: str = "ACTIVADO"
 
         self.consumer = Consumer({
-            'bootstrap.servers': f"{self.broker_host}:{self.broker_port}",
+            'bootstrap.servers': self.broker,
             'group.id': f'engine-service-{self.id}',
             'auto.offset.reset': 'latest',
             'enable.auto.commit': True
         })
 
-        self.producer = Producer({'bootstrap.servers': f"{self.broker_host}:{self.broker_port}"})
+        self.producer = Producer({'bootstrap.servers': self.broker})
 
     def start(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -318,17 +316,13 @@ def engine_ui(engine: Engine):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Engine de CP")
     parser.add_argument("id", help="ID del Charging Point")
-    parser.add_argument("--broker-host", default="0.0.0.0", help="IP de la central")
-    parser.add_argument("--broker-port", type=int, default=9092, help="Puerto de la central")
-    parser.add_argument("--port", type=int, default=5002, help="Puerto de escucha del Engine")
+    parser.add_argument("--broker", default="localhost:9092", help="IP de la central")
+    parser.add_argument("--port", type=int, default=6001, help="Puerto de escucha del Engine")
     args = parser.parse_args()
-
-    print(args.broker_host)
 
     engine = Engine(
         id=args.id, port=args.port,
-        broker_host=args.broker_host,
-        broker_port=args.broker_port
+        broker=args.broker,
     )
 
     threading.Thread(target=engine.start, args=(), daemon=True).start()

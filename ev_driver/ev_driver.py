@@ -9,10 +9,9 @@ from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 TOPIC = "central-request"
 
 class Driver:
-    def __init__(self, id: str, broker_host="0.0.0.0", broker_port=9092, filename=None):
+    def __init__(self, id: str, broker="localhost:9092", filename=None):
         self.id = id
-        self.broker_host = broker_host
-        self.broker_port = broker_port
+        self.broker = broker
         self.filename = filename
 
         self.exit = False
@@ -23,14 +22,14 @@ class Driver:
         }
 
         self.consumer = Consumer({
-            'bootstrap.servers': f"{broker_host}:{broker_port}",
+            'bootstrap.servers': self.broker,
             'group.id': f'driver-service-{self.id}',
             'auto.offset.reset': 'latest',
             'enable.auto.commit': True
         })
         self.consumer.subscribe([TOPIC])
 
-        self.producer = Producer({'bootstrap.servers': f"{broker_host}:{broker_port}"})
+        self.producer = Producer({'bootstrap.servers': self.broker})
 
     def kafka_listener(self):
         with ThreadPoolExecutor(max_workers=4) as executor:
@@ -153,15 +152,13 @@ class Driver:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_DRIVER")
     parser.add_argument("id", help="ID del Driver")
-    parser.add_argument("--broker-host", default="0.0.0.0", help="IP de la central")
-    parser.add_argument("--broker-port", type=int, default=9092, help="Puerto de la central")
+    parser.add_argument("--broker", default="localhost:9092", help="IP del broker")
     parser.add_argument("--file", default=None, help="Fichero de operaciones")
     args = parser.parse_args()
 
     driver = Driver(
         id=args.id,
-        broker_host=args.broker_host,
-        broker_port=args.broker_port,
+        broker=args.broker,
         filename=args.file
     )
 
