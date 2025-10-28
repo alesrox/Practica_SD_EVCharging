@@ -48,6 +48,9 @@ class EV_Central_UI:
         frame.grid(row=index // 4, column=index % 4, padx=10, pady=10)
         frame.pack_propagate(False)
 
+        # 👉 Hacemos el frame clickeable
+        frame.bind("<Button-1>", lambda e, pid=punto.id: self.on_click(pid))
+
         label_status = tk.Label(
             frame, text=punto.estado.name, font=("Arial", 9, "italic"), fg="white", bg=bg_color
         )
@@ -84,6 +87,9 @@ class EV_Central_UI:
             "price": label_price,
             "extras": [label_driver, label_kwh, label_ticket]
         }
+
+    def on_click(self, punto_id):
+        print(f"[CLICK] Punto clickeado: {punto_id}")
 
     def _update_point_frame(self, punto, bg_color):
         frame_data = self.frames[punto.id]

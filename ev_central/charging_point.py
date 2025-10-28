@@ -22,3 +22,6 @@ class EV_CP:
         self.driver = driver
         self.kwh = kwh
         self.ticket = ticket
+
+    def can_supply(self) -> bool:
+        return self.estado == EstadoCP.ACTIVADO

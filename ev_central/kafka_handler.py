@@ -5,9 +5,9 @@ from concurrent.futures import ThreadPoolExecutor
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 
 class Kafka_Handler:
-    def __init__(self, gestor, broker_host="localhost", broker_port=9092, topic="central-request"):
+    def __init__(self, gestor, broker="localhost:9092", topic="central-request"):
         self.gestor = gestor
-        self.broker = f"{broker_host}:{broker_port}"
+        self.broker = broker
         self.topic = topic
 
         self.consumer = self._crear_consumidor()
@@ -79,7 +79,10 @@ class Kafka_Handler:
 
             print(f"[INFO] Solicitud recibida de {engine_id} (ID {id})")
 
-            status = "approved" if self.gestor.can_supply(engine_id) else "denied"
+            
+            # status = "approved" if self.gestor.can_supply(engine_id) else "denied"
+            cp = self.gestor.charging_points[engine_id]
+            status = "approved" if cp.can_supply() else "denied"
 
             response = {
                 "type": "engine_supply_response",
@@ -102,7 +105,8 @@ class Kafka_Handler:
         id = data.get("id")
 
         print(f"[INFO] Solicitud de {driver_id} para usar en {engine_id} (ID {id})")
-        if self.gestor.can_supply(engine_id):
+        cp = self.gestor.charging_points[engine_id]
+        if cp.can_supply():
             print(f"[INFO] El CP {engine_id} está Operativo. Comprobando disponibilidad...")
             msg = {
                 "id": id,
@@ -127,7 +131,6 @@ class Kafka_Handler:
         
         self.producer.produce(self.topic, json.dumps(msg).encode("utf-8"))
         self.producer.flush()
-
 
     def _response_driver(self, data, status="KO"):
         engine_id = data.get("engine_id")
