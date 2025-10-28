@@ -12,13 +12,17 @@ from kafka_handler import Kafka_Handler
 from socket_handler import Socket_Handler
 
 class EV_Central:
-    def __init__(self, ui_callback=None, broker: str = "localhost:9092"):
+    def __init__(
+        self, ui_callback = None, 
+        broker: str = "localhost:9092", 
+        port: int = 6000
+    ):
         self.bd = db.DataBase()
         self.charging_points: Dict[str, EV_CP] = self.bd.load_charging_points()
         self.last_msg: Dict[str, float] = {}
         self.ui_callback = ui_callback
 
-        self.socket_handler = Socket_Handler(self)
+        self.socket_handler = Socket_Handler(self, port=port)
         self.kafka_handler = Kafka_Handler(self, broker)
 
     def _notificar_ui(self):
@@ -193,11 +197,13 @@ class EV_Central:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_CENTRAL")
     parser.add_argument("--broker", default="localhost:9092", help="Dirección del broker")
+    parser.add_argument("--port", type=int, default=6000, help="Puerto de escucha")
     args = parser.parse_args()
 
 
     gestor = EV_Central(
-        broker = args.broker
+        broker = args.broker,
+        port = args.port
     )
 
     ui = EV_Central_UI(gestor)
