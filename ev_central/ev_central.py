@@ -1,5 +1,6 @@
 from typing import Dict
 
+import uuid
 import time
 import argparse
 import threading
@@ -56,29 +57,138 @@ class EV_Central:
             gestor.last_msg[id] = time.time()
             self._notificar_ui()
     
+    # LOW LEVEL
+    def procesar_solicitud_cp(self, data):
+        id = data.get("id")
+        cp_id = data.get("cp")
+        
+        print(f"[INFO] Solicitud de suministro recibida de {cp_id} ({id})")
+        cp = self.charging_points[cp_id]
+        status = "approved" if cp.can_supply() else "denied"
+
+        response = {
+            "id": id,
+            "type": "engine_supply_response",
+            "cp": cp_id,
+            "status": status,
+            "timestamp": time.time()
+        }
+
+        print(f"[INFO] Solicitud {id}: {status}")
+        self.kafka_handler.send_msg(response)
+
+    def procesar_solicitud_driver(self, data):
+        id = data.get("id")
+        cp_id = data.get("cp")
+        driver = data.get("driver")
+
+        print(f"[INFO] {driver} ha solicitado recargar en {cp_id} ({id})")
+        cp = self.charging_points[cp_id]
+        msg = None
+
+        if cp.can_supply():
+            print(f"[INFO] El CP {cp_id} está Operativo. Comprobando disponibilidad...")
+            msg = {
+                "id": id,
+                "type": "supply_request",
+                "status": "aceptada",
+                "cp": cp_id,
+                "driver": driver,
+                "timestamp": time.time()
+            }
+
+        else:
+            print(f"[INFO] {cp_id} no disponible: Solicitud denegada ({id})")
+            msg = {
+                "id": id,
+                "type": "start_supply",
+                "status": "denegada",
+                "driver": driver,
+                "cp": cp_id,
+                "timestamp": time.time()
+            }
+        
+        self.kafka_handler.send_msg(msg)
+
+    def supply_response(self, data):
+        id = data.get("id")
+        cp_id = data.get("cp")
+        driver = data.get("driver")
+        status = data.get("status", "denegada")
+
+        print(f"[INFO] Solicitud {id}: {status}")
+
+        response = {
+            "id": id,
+            "type": "start_supply",
+            "cp": cp_id,
+            "driver": driver,
+            "status": status,
+            "timestamp": time.time()
+        }
+
+        self.kafka_handler.send_msg(response)
+
+    def share_cp(self, data):
+        id = data.get("id")
+        driver = data.get("driver")
+
+        print(f"[INFO] {driver} ha solicitado los CP disponibles ({id})")
+
+        for_share_cp = [
+            cp_id for cp_id, punto in self.charging_points.items()
+            if punto.estado == EstadoCP.ACTIVADO
+        ]
+
+        response = {
+            "type": "driver_cp_info_resposne",
+            "driver": driver,
+            "id": id,
+            "info": for_share_cp,
+            "timestamp": time.time(),
+        }
+
+        print(f"[INFO] Enviando CPs disponibles a {driver} ({id})")
+        self.kafka_handler.send_msg(response)
+
+    # TOP LEVEL
     def suministrando(self, data):
-        cp_id = data.get("engine_id")
-        driver_id = data.get("driver_id")
+        cp_id = data.get("cp")
+        driver = data.get("driver")
         kwh = float(data.get("consumo"))
         price = self.charging_points[cp_id].price
 
-        self.charging_points[cp_id].driver = driver_id
+        self.charging_points[cp_id].driver = driver
         self.charging_points[cp_id].kwh = kwh
         self.charging_points[cp_id].ticket = round(kwh * price, 2)
 
-        driver_msg = f"a {driver_id}" if driver_id else ""
+        driver_msg = f"a {driver}" if driver else ""
         print(f"[INFO] {cp_id} ha suministrado {kwh} kWh {driver_msg}")
         self._notificar_ui()
 
     def finalizar_suministro(self, data, error=False):
-        cp_id = data.get("engine_id")
-        # driver_id = data.get("driver_id")
+        cp_id = data.get("cp")
+        driver = data.get("driver", None)
         kwh = data.get("consumo")
         price = self.charging_points[cp_id].price
 
-        error_msg = "debido a una averia" if error else ""
-        ticket = round(kwh * price, 2)
-        print(f"[INFO] {cp_id} ha finalizado {error_msg} ({kwh} kWh): {ticket}€")
+        total_ticket = round(kwh * price, 2)
+        if error:
+            print(f"[INFO] {cp_id} ha finalizado debido a una averia ({kwh} kWh): {total_ticket}€")
+        else:
+            print(f"[INFO] {cp_id} ha finalizado ({kwh} kWh): {total_ticket}€")
+
+        if driver:
+            ticket = {
+                "id": str(uuid.uuid4()),
+                "type": "ticket",
+                "driver": driver,
+                "consumo": kwh,
+                "total": total_ticket
+            }
+            print(f"[INFO] Enviando ticket a {driver}")
+            self.kafka_handler.send_msg(ticket)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_CENTRAL")

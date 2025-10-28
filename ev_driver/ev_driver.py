@@ -53,7 +53,7 @@ class Driver:
                 self.consumer.close()
     
     def _procesar_driver_msg(self, data):
-        if data.get("driver_id") != self.id: return
+        if data.get("driver") != self.id: return
         t = data.get("type")
 
         check_id = data.get("id") in self.unresponsed["driver_cp_info"]
@@ -67,24 +67,29 @@ class Driver:
         if t == "supply_request" and data.get("id") in self.unresponsed["driver_supply_request"]:
             self.unresponsed["driver_supply_request"].clear()
             if data.get("status") == "aceptada":
-                print(f"[INFO] Surtidor {data.get('engine_id')} disponible para suministro.")
+                print(f"[INFO] Surtidor {data.get('cp')} disponible para suministro.")
             else:
-                print(f"[INFO] Suministro con {data.get('engine_id')}: solicitud denegada")
+                print(f"[INFO] Suministro con {data.get('cp')}: solicitud denegada")
         elif t == "start_supply":
-            engine_id = data.get("engine_id")
+            cp = data.get("cp")
             if data.get("status") == "aceptada":
-                print(f"[INFO] Suministro con {engine_id} iniciado: ya puede enchufar el vehículo.")
+                print(f"[INFO] Suministro con {cp} iniciado: ya puede enchufar el vehículo.")
             else:
-                print(f"[INFO] Suministro con {engine_id}: solicitud denegada")
+                print(f"[INFO] Suministro con {cp}: solicitud denegada")
+                time.sleep(4)
                 self.ask_for_cp()
         elif t == "init_supply":
-            cp_id = data.get("engine_id")
+            cp_id = data.get("cp")
             print(f"[INFO] {cp_id} ha empezado a suministrar")
         elif t == "supply_info":
             kwh = float(data.get("consumo"))
-            print(f"[INFO] Consumo: {kwh}")
-        elif t == "end_supply":
+            print(f"[INFO] Consumo: {kwh} kWh")
+        elif t == "ticket":
             print("[INFO] Fin de suministro.")
+            consumo = data.get('consumo')
+            total = data.get('total')
+            print(f"[TICKET] Consumo: {consumo} kWh - Total: {total}€")
+            time.sleep(4)
             self.ask_for_cp()
     
     def start(self):
@@ -104,8 +109,8 @@ class Driver:
         mensaje = {
             "id": req_id,
             "type": "driver_supply_request",
-            "driver_id": self.id,
-            "engine_id": cp_id,
+            "driver": self.id,
+            "cp": cp_id,
             "timestamp": time.time(),
         }
 
@@ -119,7 +124,7 @@ class Driver:
         self.unresponsed["driver_cp_info"].append(req_id)
         msg = {
             "type": "driver_cp_info",
-            "driver_id": self.id,
+            "driver": self.id,
             "id": req_id,
             "timestamp": time.time(),
         }

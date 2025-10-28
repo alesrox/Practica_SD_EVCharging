@@ -8,7 +8,7 @@ import threading
 import tkinter as tk
 
 from concurrent.futures import ThreadPoolExecutor
-from confluent_kafka import Producer, Consumer, KafkaError
+from confluent_kafka import Producer, Consumer, KafkaError, KafkaException
 
 TOPIC = "central-request"
 
@@ -26,8 +26,6 @@ class Engine:
         self.host = "0.0.0.0"
         self.port = port
 
-        self._stop_event = threading.Event()
-
         self.ko_mode: bool = False
         self.can_supply: bool = False
         self.kwh: float = 0.0
@@ -40,6 +38,7 @@ class Engine:
             'auto.offset.reset': 'latest',
             'enable.auto.commit': True
         })
+        self.consumer.subscribe([TOPIC])
 
         self.producer = Producer({'bootstrap.servers': self.broker})
 
@@ -52,7 +51,7 @@ class Engine:
         print(f"[SOCKET] Escuchando en {self.host}:{self.port}")
 
         try:
-            while not self._stop_event.is_set():
+            while True:
                 try:
                     client, addr = server.accept()
                 except socket.timeout:
@@ -95,41 +94,32 @@ class Engine:
             print("[SOCKET] Error enviando status:", e)
 
     def kafka_listener(self):
-        self.consumer.subscribe([TOPIC])
         with ThreadPoolExecutor(max_workers=4) as executor:
             try:
-                while not self._stop_event.is_set():
-                    try:
-                        msg = self.consumer.poll(1.0)
-                    except Exception as e:
-                        print(f"[KAFKA] Error en poll: {e}")
-                        time.sleep(1)
-                        continue
-
+                while True:
+                    msg = self.consumer.poll(1.0)
                     if msg is None:
                         continue
                     if msg.error():
                         if msg.error().code() != KafkaError._PARTITION_EOF:
-                            print(f"[KAFKA] Error de mensaje: {msg.error()}")
+                            raise KafkaException(msg.error())
                         continue
                     try:
                         data = json.loads(msg.value().decode("utf-8"))
+                        executor.submit(self._procesar_mensaje, data)
                     except Exception as e:
                         print(f"[KAFKA] Mensaje no válido recibido: {e}")
-                        continue
-
-                    executor.submit(self._procesar_mensaje, data)
             except Exception as e:
                 print(f"[KAFKA] Error en el consumidor Kafka: {e}")
             finally:
-                try:
-                    self.consumer.close()
-                except Exception:
-                    pass
-                print("[KAFKA] Listener detenido")
+                self.consumer.close()
+
+    def send_kafka_msg(self, msg):
+        self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
+        self.producer.flush(timeout=5)
 
     def _procesar_mensaje(self, data):
-        if data.get("engine_id") == self.id and not self.ko_mode:
+        if data.get("cp") == self.id and not self.ko_mode:
             t = data.get("type")
             if t == "engine_supply_response":
                 status = data.get('status')
@@ -138,35 +128,31 @@ class Engine:
             elif t == "supply_request":
                 self.supply_request(data)
             elif t == "start_supply" and data.get("status") != "denegada":
-                self.driver = data.get("driver_id")
+                self.driver = data.get("driver")
                 self.can_supply = True
+                print(f"[INFO] Ya puede conectar el vehiculo de {self.driver}")
 
     def supply_request(self, data):
         c_id = data.get("id")
-        driver_id = data.get('driver_id')
-        print(f"[INFO] Solicitud de suministro para {driver_id} ({c_id})")
+        driver = data.get('driver')
+        print(f"[INFO] Solicitud de suministro para {driver} ({c_id})")
 
-        _aux = self.can_supply and self.driver != driver_id
+        _aux = self.can_supply and self.driver != driver
         accepted = not _aux
         status = "aceptada" if accepted else "denegada"
 
         response = {
-            "type": "supply_response",
-            "engine_id": self.id,
-            "driver_id": driver_id,
             "id": c_id,
+            "type": "supply_response",
+            "cp": self.id,
+            "driver": driver,
             "status": status,
             "timestamp": time.time()
         }
 
         if accepted: self.can_supply = True
         print(f"[INFO] Solicitud: {status} ({c_id})")
-
-        try:
-            self.producer.produce(TOPIC, json.dumps(response).encode("utf-8"))
-            self.producer.flush(timeout=5)
-        except Exception as e:
-            print(f"[KAFKA] Error enviando respuesta de supply: {e}")
+        self.send_kafka_msg(response)
 
     def suministrar(self, label: tk.Label):
         self.kwh = 0.0
@@ -182,88 +168,55 @@ class Engine:
         print("[INFO] SUMINISTRANDO...")
         self.supply_msg("init_supply")
 
-        try:
-            while self.can_supply and not self._stop_event.is_set():
-                while self.ko_mode and not self._stop_event.is_set():
-                    time.sleep(0.5)
+        while self.can_supply and not self.ko_mode:
+            increment = random.choice([x * 0.5 for x in range(16, 23)])
+            self.kwh += increment
+            _price = round(self.kwh * self.price, 2)
 
-                increment = random.choice([x * 0.5 for x in range(16, 23)])
-                self.kwh += increment
+            # if label:
+            #     label.after(0, lambda v=self.kwh, p=_price: label.config(text=f"Consumo: {v:.2f} kWh | {p:.2f}€"))
+            label.config(text=f"Consumo: {self.kwh:.2f} kWh | {_price:.2f}€")
 
-                _price = round(self.kwh * self.price, 2)
-                # actualizar label de forma thread-safe
-                if label:
-                    label.after(0, lambda v=self.kwh, p=_price: label.config(text=f"Consumo: {v:.2f} kWh | {p:.2f}€"))
+            msg = {
+                "id": str(uuid.uuid4()),
+                "type": "supply_info",
+                "cp": self.id,
+                "driver": self.driver,
+                "consumo": self.kwh,
+                "total": _price,
+                "timestamp": time.time()
+            }
+            
+            print(f"[INFO] Consumo: {self.kwh} kWh")
+            self.send_kafka_msg(msg)
+            time.sleep(2)
 
-                msg = {
-                    "type": "supply_info",
-                    "engine_id": self.id,
-                    "driver_id": self.driver,
-                    "id": str(uuid.uuid4()),
-                    "consumo": round(self.kwh, 2),
-                    "timestamp": time.time()
-                }
-
-                print(f"[INFO] {self.kwh:.2f} kWh totales suministrados")
-
-                try:
-                    self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
-                    self.producer.flush(timeout=5)
-                except Exception as e:
-                    print(f"[KAFKA] Error enviando supply_info: {e}")
-
-                time.sleep(2)
-        finally:
-            try:
-                self.supply_msg("end_supply")
-            except Exception:
-                pass
-            print(f"[INFO] FINALIZADO (Total: {self.kwh:.2f} kWh)")
-            self.status = "ACTIVADO"
-            self.driver = None
-            if label:
-                label.after(0, lambda: label.config(text=f"Consumo: 0.00 kWh | 0.00€"))
+        self.supply_msg("end_supply")
+        print(f"[INFO] FINALIZADO (Total: {self.kwh:.2f} kWh)")
+        self.status = "ACTIVADO"
+        label.config(text=f"Consumo: 0.00 kWh | 0.00€")
+        # if label:
+        #     label.after(0, lambda: label.config(text=f"Consumo: 0.00 kWh | 0.00€"))
 
     def supply_msg(self, msg_id: str = "init_supply"):
         msg = {
             "type": msg_id,
-            "engine_id": self.id,
-            "driver_id": self.driver,
+            "cp": self.id,
+            "driver": self.driver,
             "consumo": round(self.kwh, 2),
             "timestamp": time.time()
         }
-        try:
-            self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
-            self.producer.flush(timeout=5)
-        except Exception as e:
-            print(f"[KAFKA] Error en supply_msg: {e}")
+        self.send_kafka_msg(msg)
 
     def solicitar_suministro(self):
         req_id = str(uuid.uuid4())
         msg = {
-            "type": "engine_supply_request",
             "id": req_id,
-            "engine_id": self.id,
+            "type": "cp_supply_request",
+            "cp": self.id,
             "timestamp": time.time(),
         }
-        try:
-            self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
-            self.producer.flush(timeout=5)
-            print(f"[INFO] Solicitud enviada al topic '{TOPIC}' (id={req_id})")
-        except Exception as e:
-            print(f"[KAFKA] Error enviando engine_supply_request: {e}")
-
-    def stop(self):
-        self._stop_event.set()
-        try:
-            self.consumer.close()
-        except Exception:
-            pass
-        try:
-            self.producer.flush(timeout=2)
-        except Exception:
-            pass
-        print("[ENGINE] detenido")
+        self.send_kafka_msg(msg)
 
 def engine_ui(engine: Engine):
     def toggle_ko():
@@ -273,7 +226,8 @@ def engine_ui(engine: Engine):
     def solicitar_suministro_ui():
         if engine.can_supply:
             return
-        label_consumo.config(text="Consumo: 0.00 kWh | 0.00€")
+        # label_consumo.config(text="Consumo: 0.00 kWh | 0.00€")
+        engine.driver = None
         engine.solicitar_suministro()
 
     def conectar():
@@ -287,11 +241,6 @@ def engine_ui(engine: Engine):
         on_button.pack(pady=(5, 10))
         off_button.pack_forget()
         engine.can_supply = False
-        engine.driver = None
-
-    def on_close():
-        engine.stop()
-        root.destroy()
 
     root = tk.Tk()
     root.title(f"Engine {engine.id}")
@@ -310,7 +259,6 @@ def engine_ui(engine: Engine):
 
     off_button = tk.Button(root, text="Desconectar", width=20, command=desconectar)
 
-    root.protocol("WM_DELETE_WINDOW", on_close)
     root.mainloop()
 
 if __name__ == "__main__":
