@@ -58,6 +58,14 @@ class EV_Central:
             cond_su = self.charging_points[id].estado == EstadoCP.SUMINISTRANDO
             if cond_av and cond_su:
                 print(f"[ERROR] {id} ha caído mientras suministraba")
+                cp = self.charging_points[id]
+                data = {
+                    "cp": id,
+                    "driver": cp.driver,
+                    "consumo": cp.kwh
+                }
+
+                self.finalizar_suministro(data, True)
 
             self.charging_points[id].estado = nuevo_estado
             gestor.last_msg[id] = time.time()
@@ -208,14 +216,13 @@ class EV_Central:
 
         driver_msg = f"a {driver}" if driver else ""
         print(f"[INFO] {cp_id} ha suministrado {kwh} kWh {driver_msg}")
-        self.kafka_handler.send_msg(data, self.topic(self.drivers[driver]))
+        if driver: self.kafka_handler.send_msg(data, self.topic(self.drivers[driver]))
         self._notificar_ui()
 
     def finalizar_suministro(self, data, error=False):
         cp_id = data.get("cp")
         driver = data.get("driver", None)
         kwh = data.get("consumo")
-        zone = self.drivers[driver]
         price = self.charging_points[cp_id].price
 
         total_ticket = round(kwh * price, 2)
@@ -225,6 +232,8 @@ class EV_Central:
             print(f"[INFO] {cp_id} ha finalizado ({kwh} kWh): {total_ticket}€")
 
         if driver:
+            zone = self.drivers[driver]
+
             ticket = {
                 "id": str(uuid.uuid4()),
                 "type": "ticket",
@@ -233,6 +242,7 @@ class EV_Central:
                 "zone": zone,
                 "total": total_ticket
             }
+
             print(f"[INFO] Enviando ticket a {driver}")
             self.kafka_handler.send_msg(ticket, self.topic(zone))
         

@@ -120,7 +120,7 @@ class EV_Central_UI:
 
     def _update_supply_info(self, punto):
         label_driver, label_kwh, label_ticket = self.frames[punto.id]["extras"]
-        if punto.driver: label_driver.config(text=f"Driver: {punto.driver}")
+        label_driver.config(text=f"Driver: {punto.driver or 'N/A'}")
         label_kwh.config(text=f"Consumo: {punto.kwh} kWh")
         label_ticket.config(text=f"Importe: {punto.ticket} €")
 

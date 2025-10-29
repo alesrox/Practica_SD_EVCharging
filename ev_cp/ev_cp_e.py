@@ -213,6 +213,7 @@ class Engine:
 
     def supply_msg(self, msg_id: str = "init_supply"):
         msg = {
+            "id": str(uuid.uuid4()),
             "type": msg_id,
             "cp": self.id,
             "driver": self.driver,
@@ -220,6 +221,7 @@ class Engine:
             "consumo": round(self.kwh, 2),
             "timestamp": time.time()
         }
+        
         self.send_kafka_msg(msg)
 
     def solicitar_suministro(self):
