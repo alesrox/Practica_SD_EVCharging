@@ -17,9 +17,13 @@ while True:
 
 # Definir topics
 topics = [
-    NewTopic("central-request", num_partitions=3, replication_factor=1),
-    NewTopic("engine-response", num_partitions=3, replication_factor=1),
-    NewTopic("driver-response", num_partitions=3, replication_factor=1)
+    NewTopic("zone0-central-request", num_partitions=3, replication_factor=1),
+    NewTopic("zone1-central-request", num_partitions=3, replication_factor=1),
+    NewTopic("zone2-central-request", num_partitions=3, replication_factor=1),
+
+    NewTopic("zone0-central-response", num_partitions=3, replication_factor=1),
+    NewTopic("zone1-central-response", num_partitions=3, replication_factor=1),
+    NewTopic("zone2-central-response", num_partitions=3, replication_factor=1),
 ]
 
 # Crear topics

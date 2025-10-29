@@ -10,8 +10,6 @@ import tkinter as tk
 from concurrent.futures import ThreadPoolExecutor
 from confluent_kafka import Producer, Consumer, KafkaError, KafkaException
 
-TOPIC = "central-request"
-
 class Engine:
     def __init__(
         self, id: str, location: str = "Zone 0", price: float = 0.6,
@@ -32,13 +30,17 @@ class Engine:
         self.driver: str = None
         self.status: str = "ACTIVADO"
 
+        _topic = location.replace(" ", "").lower()
+        self.consumer_topic = f"{_topic}-central-response"
+        self.producer_topic = f"{_topic}-central-request"
+
         self.consumer = Consumer({
             'bootstrap.servers': self.broker,
             'group.id': f'engine-service-{self.id}',
             'auto.offset.reset': 'latest',
             'enable.auto.commit': True
         })
-        self.consumer.subscribe([TOPIC])
+        self.consumer.subscribe([self.consumer_topic])
 
         self.producer = Producer({'bootstrap.servers': self.broker})
 
@@ -115,7 +117,7 @@ class Engine:
                 self.consumer.close()
 
     def send_kafka_msg(self, msg):
-        self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
+        self.producer.produce(self.producer_topic, json.dumps(msg).encode("utf-8"))
         self.producer.flush(timeout=5)
 
     def _procesar_mensaje(self, data):
@@ -156,6 +158,7 @@ class Engine:
             "cp": self.id,
             "driver": driver,
             "status": status,
+            "zone": self.location,
             "timestamp": time.time()
         }
 
@@ -191,6 +194,7 @@ class Engine:
                 "type": "supply_info",
                 "cp": self.id,
                 "driver": self.driver,
+                "zone": self.location,
                 "consumo": self.kwh,
                 "total": _price,
                 "timestamp": time.time()
@@ -212,6 +216,7 @@ class Engine:
             "type": msg_id,
             "cp": self.id,
             "driver": self.driver,
+            "zone": self.location,
             "consumo": round(self.kwh, 2),
             "timestamp": time.time()
         }
@@ -223,6 +228,7 @@ class Engine:
             "id": req_id,
             "type": "cp_supply_request",
             "cp": self.id,
+            "zone": self.location,
             "timestamp": time.time(),
         }
         self.send_kafka_msg(msg)
@@ -273,12 +279,15 @@ def engine_ui(engine: Engine):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Engine de CP")
     parser.add_argument("id", help="ID del Charging Point")
+    parser.add_argument("--location", default="Zone 0", help="Ubicación del CP")
     parser.add_argument("--broker", default="localhost:9092", help="IP de la central")
     parser.add_argument("--port", type=int, default=6001, help="Puerto de escucha del Engine")
     args = parser.parse_args()
 
     engine = Engine(
-        id=args.id, port=args.port,
+        id=args.id, 
+        location=args.location,
+        port=args.port,
         broker=args.broker,
     )
 

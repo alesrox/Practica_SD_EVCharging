@@ -18,9 +18,11 @@ class EV_Central:
         port: int = 6000
     ):
         self.bd = db.DataBase()
-        self.charging_points: Dict[str, EV_CP] = self.bd.load_charging_points()
         self.last_msg: Dict[str, float] = {}
         self.ui_callback = ui_callback
+
+        self.charging_points: Dict[str, EV_CP] = self.bd.load_charging_points()
+        self.drivers: Dict[str, str] = {}
 
         self.socket_handler = Socket_Handler(self, port=port)
         self.kafka_handler = Kafka_Handler(self, broker)
@@ -60,11 +62,15 @@ class EV_Central:
             self.charging_points[id].estado = nuevo_estado
             gestor.last_msg[id] = time.time()
             self._notificar_ui()
+
+    def topic(self, zone):
+        _zone = zone.replace(" ", "").lower()
+        return f"{_zone}-central-response"
     
-    # LOW LEVEL
     def procesar_solicitud_cp(self, data):
         id = data.get("id")
         cp_id = data.get("cp")
+        zone=data.get("zone")
         
         print(f"[INFO] Solicitud de suministro recibida de {cp_id} ({id})")
         cp = self.charging_points[cp_id]
@@ -75,16 +81,19 @@ class EV_Central:
             "type": "engine_supply_response",
             "cp": cp_id,
             "status": status,
+            "zone": zone,
             "timestamp": time.time()
         }
 
         print(f"[INFO] Solicitud {id}: {status}")
-        self.kafka_handler.send_msg(response)
+        self.kafka_handler.send_msg(response, self.topic(zone))
 
     def procesar_solicitud_driver(self, data):
         id = data.get("id")
         cp_id = data.get("cp")
         driver = data.get("driver")
+        zone = data.get("zone")
+        self.drivers[driver] = zone
 
         print(f"[INFO] {driver} ha solicitado recargar en {cp_id} ({id})")
         cp = self.charging_points.get(cp_id, None)
@@ -94,10 +103,10 @@ class EV_Central:
             "status": "denegada",
             "driver": driver,
             "cp": cp_id,
+            "zone": zone,
             "timestamp": time.time()
         }
 
-        
         if not cp:
             print(f"[INFO] {cp_id} no está registrado")
         elif cp.can_supply():
@@ -108,18 +117,23 @@ class EV_Central:
                 "status": "aceptada",
                 "cp": cp_id,
                 "driver": driver,
+                "zone": zone,
                 "timestamp": time.time()
             }
+
+            if zone != cp.location:
+                self.kafka_handler.send_msg(msg, self.topic(cp.location))
         else:
             print(f"[INFO] {cp_id} no disponible: Solicitud denegada ({id})")
         
-        self.kafka_handler.send_msg(msg)
+        self.kafka_handler.send_msg(msg, self.topic(zone))
 
     def supply_response(self, data):
         id = data.get("id")
         cp_id = data.get("cp")
         driver = data.get("driver")
         status = data.get("status", "denegada")
+        zone = data.get("zone")
 
         print(f"[INFO] Solicitud {id}: {status}")
 
@@ -129,20 +143,26 @@ class EV_Central:
             "cp": cp_id,
             "driver": driver,
             "status": status,
+            "zone": zone,
             "timestamp": time.time()
         }
 
-        self.kafka_handler.send_msg(response)
+        cp = self.charging_points[cp_id]
+        if zone != cp.location:
+            self.kafka_handler.send_msg(response, self.topic(cp.location))
+
+        self.kafka_handler.send_msg(response, self.topic(zone))
 
     def share_cp(self, data):
         id = data.get("id")
         driver = data.get("driver")
+        zone = data.get("zone")
 
-        print(f"[INFO] {driver} ha solicitado los CP disponibles ({id})")
+        print(f"[INFO] {driver} ha solicitado los CP disponibles en {zone} ({id})")
 
         for_share_cp = [
             cp_id for cp_id, punto in self.charging_points.items()
-            if punto.estado == EstadoCP.ACTIVADO
+            if punto.estado == EstadoCP.ACTIVADO and punto.location == zone
         ]
 
         response = {
@@ -150,11 +170,12 @@ class EV_Central:
             "type": "driver_cp_info_resposne",
             "driver": driver,
             "info": for_share_cp,
+            "zone": zone,
             "timestamp": time.time(),
         }
 
         print(f"[INFO] Enviando CPs disponibles a {driver} ({id})")
-        self.kafka_handler.send_msg(response)
+        self.kafka_handler.send_msg(response, self.topic(zone))
 
     def parar_cp(self, cp_id):
         if self.charging_points[cp_id].estado == EstadoCP.PARADO:
@@ -163,17 +184,18 @@ class EV_Central:
             print(f"[INFO] Parando {cp_id}")
 
         self.actualizar_estado(cp_id, EstadoCP.PARADO)
-
+        zone = self.charging_points[cp_id].location
         msg = {
             "id": str(uuid.uuid4()),
             "type": "start_stop_services",
             "cp": cp_id,
+            "zone": zone,
             "timestamp": time.time()
         }
+        
+        zone = zone.replace(" ", "").lower()
+        self.kafka_handler.send_msg(msg, self.topic(zone))
 
-        self.kafka_handler.send_msg(msg)
-
-    # TOP LEVEL
     def suministrando(self, data):
         cp_id = data.get("cp")
         driver = data.get("driver")
@@ -186,12 +208,14 @@ class EV_Central:
 
         driver_msg = f"a {driver}" if driver else ""
         print(f"[INFO] {cp_id} ha suministrado {kwh} kWh {driver_msg}")
+        self.kafka_handler.send_msg(data, self.topic(self.drivers[driver]))
         self._notificar_ui()
 
     def finalizar_suministro(self, data, error=False):
         cp_id = data.get("cp")
         driver = data.get("driver", None)
         kwh = data.get("consumo")
+        zone = self.drivers[driver]
         price = self.charging_points[cp_id].price
 
         total_ticket = round(kwh * price, 2)
@@ -206,18 +230,17 @@ class EV_Central:
                 "type": "ticket",
                 "driver": driver,
                 "consumo": kwh,
+                "zone": zone,
                 "total": total_ticket
             }
             print(f"[INFO] Enviando ticket a {driver}")
-            self.kafka_handler.send_msg(ticket)
-
+            self.kafka_handler.send_msg(ticket, self.topic(zone))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_CENTRAL")
     parser.add_argument("--broker", default="localhost:9092", help="Dirección del broker")
     parser.add_argument("--port", type=int, default=6000, help="Puerto de escucha")
     args = parser.parse_args()
-
 
     gestor = EV_Central(
         broker = args.broker,

@@ -6,10 +6,8 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 
-TOPIC = "central-request"
-
 class Driver:
-    def __init__(self, id: str, broker="localhost:9092", filename=None):
+    def __init__(self, id: str, location="Zone 0", broker="localhost:9092", filename=None):
         self.id = id
         self.broker = broker
         self.filename = filename
@@ -22,13 +20,18 @@ class Driver:
             "driver_supply_request": []
         }
 
+        self.location = location
+        _topic = location.replace(" ", "").lower()
+        self.consumer_topic = f"{_topic}-central-response"
+        self.producer_topic = f"{_topic}-central-request"
+
         self.consumer = Consumer({
             'bootstrap.servers': self.broker,
             'group.id': f'driver-service-{self.id}',
             'auto.offset.reset': 'latest',
             'enable.auto.commit': True
         })
-        self.consumer.subscribe([TOPIC])
+        self.consumer.subscribe([self.consumer_topic])
 
         self.producer = Producer({'bootstrap.servers': self.broker})
 
@@ -138,10 +141,11 @@ class Driver:
             "type": "driver_supply_request",
             "driver": self.id,
             "cp": cp_id,
+            "zone": self.location,
             "timestamp": time.time(),
         }
 
-        self.producer.produce(TOPIC, json.dumps(mensaje).encode("utf-8"))
+        self.producer.produce(self.producer_topic, json.dumps(mensaje).encode("utf-8"))
         self.producer.flush(timeout=5)
 
     def ask_for_cp(self):
@@ -150,18 +154,19 @@ class Driver:
         req_id = str(uuid.uuid4())
         self.unresponsed["driver_cp_info"].append(req_id)
         msg = {
+            "id": req_id,
             "type": "driver_cp_info",
             "driver": self.id,
-            "id": req_id,
+            "zone": self.location,
             "timestamp": time.time(),
         }
 
-        self.producer.produce(TOPIC, json.dumps(msg).encode("utf-8"))
+        self.producer.produce(self.producer_topic, json.dumps(msg).encode("utf-8"))
         self.producer.flush(timeout=5)
 
     def show_cp(self, data):
         info = data.get("info", [])
-        print("\nPuntos de carga disponibles:")
+        print(f"\nPuntos de carga disponibles en {self.location}:")
         for cp_id in info:
             print(f"  - CP: {cp_id}")
         
@@ -184,12 +189,14 @@ class Driver:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_DRIVER")
     parser.add_argument("id", help="ID del Driver")
+    parser.add_argument("--location", default="Zone 0", help="Ubicación")
     parser.add_argument("--broker", default="localhost:9092", help="IP del broker")
     parser.add_argument("--file", default=None, help="Fichero de operaciones")
     args = parser.parse_args()
 
     driver = Driver(
         id=args.id,
+        location=args.location,
         broker=args.broker,
         filename=args.file
     )

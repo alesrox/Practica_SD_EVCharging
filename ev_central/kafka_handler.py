@@ -4,10 +4,14 @@ from concurrent.futures import ThreadPoolExecutor
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 
 class Kafka_Handler:
-    def __init__(self, gestor, broker="localhost:9092", topic="central-request"):
+    def __init__(self, gestor, broker="localhost:9092"):
         self.gestor = gestor
         self.broker = broker
-        self.topic = topic
+        self.topics = [
+            "zone0-central-request",
+            "zone1-central-request",
+            "zone2-central-request"
+        ]
 
         self.consumer = self._crear_consumidor()
         self.producer = self._crear_productor()
@@ -20,8 +24,8 @@ class Kafka_Handler:
             'enable.auto.commit': True
         }
         consumer = Consumer(conf)
-        consumer.subscribe([self.topic])
-        print(f"[KAFKA] Escuchando solicitudes en topic '{self.topic}'...")
+        consumer.subscribe(self.topics)
+        print(f"[KAFKA] Escuchando solicitudes...")
         return consumer
 
     def _crear_productor(self):
@@ -74,7 +78,7 @@ class Kafka_Handler:
         except Exception as e:
             print(e)
 
-    def send_msg(self, msg):
-        self.producer.produce(self.topic, json.dumps(msg).encode("utf-8"))
+    def send_msg(self, msg, topic):
+        self.producer.produce(topic, json.dumps(msg).encode("utf-8"))
         self.producer.flush(timeout=5)
         # print(f"[KAFKA] Message sent ({msg['id']})")
