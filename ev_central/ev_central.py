@@ -17,11 +17,11 @@ class EV_Central:
         broker: str = "localhost:9092", 
         port: int = 6000
     ):
-        self.bd = db.DataBase()
+        self.db = db.DataBase()
         self.last_msg: Dict[str, float] = {}
         self.ui_callback = ui_callback
 
-        self.charging_points: Dict[str, EV_CP] = self.bd.load_charging_points()
+        self.charging_points: Dict[str, EV_CP] = self.db.load_charging_points()
         self.drivers: Dict[str, str] = {}
 
         self.socket_handler = Socket_Handler(self, port=port)
@@ -46,7 +46,7 @@ class EV_Central:
 
         if id not in self.charging_points:
             self.charging_points[id] = punto
-            self.bd.save_charging_points(punto)
+            self.db.save_charging_points(punto)
             gestor.last_msg[id] = time.time()
 
         self.charging_points[id].estado = EstadoCP.ACTIVADO
@@ -235,6 +235,8 @@ class EV_Central:
             }
             print(f"[INFO] Enviando ticket a {driver}")
             self.kafka_handler.send_msg(ticket, self.topic(zone))
+        
+        self.db.guardar_ticket(driver, cp_id, total_ticket)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_CENTRAL")

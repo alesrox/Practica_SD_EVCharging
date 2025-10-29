@@ -1,5 +1,6 @@
 import sqlite3
 from typing import Dict
+from datetime import datetime
 from charging_point import EV_CP, EstadoCP
 
 DB_PATH = "EV_CP.db"
@@ -19,6 +20,18 @@ class DataBase:
                 price FLOAT NOT NULL
             )
         """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS tickets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                driver_id TEXT,
+                fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                punto_carga TEXT NOT NULL,
+                total FLOAT NOT NULL,
+                FOREIGN KEY (punto_carga) REFERENCES puntos_carga(id)
+            )
+        """)
+
         conn.commit()
         conn.close()
 
@@ -42,3 +55,17 @@ class DataBase:
         for row in rows:
             puntos[row[0]] = EV_CP(row[0], row[1], row[2], estado=EstadoCP.DESCONECTADO)
         return puntos
+    
+    def guardar_ticket(self, driver, cp_id, total_ticket):
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+        fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        cursor.execute("""
+            INSERT INTO tickets (driver_id, punto_carga, total, fecha)
+            VALUES (?, ?, ?, ?)
+        """, (driver, cp_id, total_ticket, fecha))
+
+        conn.commit()
+        ticket = f"(Driver: {driver or 'N/A'}, CP: {cp_id}, Total: {total_ticket}€)"
+        print(f"[DB] Ticket guardado {ticket}")
