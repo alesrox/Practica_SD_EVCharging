@@ -33,6 +33,14 @@ class Driver:
         })
         self.consumer.subscribe([self.consumer_topic])
 
+        print("[KAFKA] Iniciando consumidor...")
+        for _ in range(500):
+            self.consumer.poll(0.5)
+            assignment = self.consumer.assignment()
+            if assignment: 
+                print(f"[KAFKA] Escuchando solicitudes...")
+                break
+
         self.producer = Producer({'bootstrap.servers': self.broker})
 
     def kafka_listener(self):
@@ -199,7 +207,7 @@ class Driver:
         for fecha, punto_carga, total in tickets:
             print(f"  • Fecha: {fecha} | Punto de carga: {punto_carga} | Total: {total}€")
 
-        print(f"[INFO] Total de tickets: {len(tickets)}")
+        print(f"[INFO] Total de tickets: {len(tickets)}\n")
 
     def get_cp(self):
         cmd = input("\nIntroduce CP (id), 'r' recargar, 'h' historial, 'q' salir: ").strip()

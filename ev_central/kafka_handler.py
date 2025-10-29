@@ -25,8 +25,17 @@ class Kafka_Handler:
         }
         consumer = Consumer(conf)
         consumer.subscribe(self.topics)
-        print(f"[KAFKA] Escuchando solicitudes...")
-        return consumer
+
+        print("[KAFKA] Iniciando consumidor...")
+        for _ in range(500):
+            consumer.poll(0.5)
+            assignment = consumer.assignment()
+            if assignment: 
+                print(f"[KAFKA] Escuchando solicitudes...")
+                return consumer
+            
+        print(f"[ERROR] No se puedo iniciar al consumidor")
+        exit(1)
 
     def _crear_productor(self):
         conf = {'bootstrap.servers': self.broker}

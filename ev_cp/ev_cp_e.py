@@ -42,6 +42,14 @@ class Engine:
         })
         self.consumer.subscribe([self.consumer_topic])
 
+        print("[KAFKA] Iniciando consumidor...")
+        for _ in range(500):
+            self.consumer.poll(0.5)
+            assignment = self.consumer.assignment()
+            if assignment: 
+                print(f"[KAFKA] Escuchando solicitudes...")
+                break
+
         self.producer = Producer({'bootstrap.servers': self.broker})
 
     def start(self):
@@ -221,7 +229,7 @@ class Engine:
             "consumo": round(self.kwh, 2),
             "timestamp": time.time()
         }
-        
+
         self.send_kafka_msg(msg)
 
     def solicitar_suministro(self):
