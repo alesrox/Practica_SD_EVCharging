@@ -93,6 +93,9 @@ class Driver:
             total = data.get('total')
             print(f"[TICKET] Consumo: {consumo} kWh - Total: {total}€")
             self._continue()
+        elif t == "ticket_history_response":
+            self.show_ticket_history(data)
+            self.ask_for_cp()
     
     def start(self):
         threading.Thread(target=self.kafka_listener, daemon=True).start()
@@ -172,12 +175,40 @@ class Driver:
         
         self.get_cp()
 
+    def get_history(self):
+        msg = {
+            "id": str(uuid.uuid4()),
+            "type": "ticket_history",
+            "driver": self.id,
+            "zone": self.location,
+            "timestamp": time.time()
+        }
+
+        self.producer.produce(self.producer_topic, json.dumps(msg).encode("utf-8"))
+        self.producer.flush(timeout=5)
+
+    def show_ticket_history(self, data):
+        driver = data.get("driver")
+        tickets = data.get("tickets", [])
+
+        print(f"\n[INFO] Historial de tickets recibido para {driver}:")
+        if not tickets:
+            print("  - No hay tickets registrados.")
+            return
+
+        for fecha, punto_carga, total in tickets:
+            print(f"  • Fecha: {fecha} | Punto de carga: {punto_carga} | Total: {total}€")
+
+        print(f"[INFO] Total de tickets: {len(tickets)}")
+
     def get_cp(self):
-        cmd = input("\nIntroduce CP (id), 'r' reintentar, 'q' salir: ").strip()
+        cmd = input("\nIntroduce CP (id), 'r' recargar, 'h' historial, 'q' salir: ").strip()
         if cmd == "q":
             self.exit = True
         elif cmd == "r":
             self.ask_for_cp()
+        elif cmd == "h":
+            self.get_history() 
         elif cmd:
             self.solicitar_carga(cmd)
             time.sleep(5)
@@ -185,6 +216,8 @@ class Driver:
                 print("[ERROR] Tiempo de espera agotado (2)")
                 self.solicitar_carga(cmd)
                 time.sleep(5)
+        else:
+            self.get_cp()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_DRIVER")

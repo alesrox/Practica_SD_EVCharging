@@ -240,13 +240,33 @@ class EV_Central:
                 "driver": driver,
                 "consumo": kwh,
                 "zone": zone,
-                "total": total_ticket
+                "total": total_ticket,
+                "timestamp": time.time()
             }
 
             print(f"[INFO] Enviando ticket a {driver}")
             self.kafka_handler.send_msg(ticket, self.topic(zone))
         
         self.db.guardar_ticket(driver, cp_id, total_ticket)
+
+    def ticket_history(self, data):
+        id = data.get("id")
+        driver = data.get("driver")
+        zone = data.get("zone")
+
+        print(f"[INFO] {driver} ha solicitado su historial de tickets")
+
+        msg = {
+            "id": id,
+            "type": "ticket_history_response",
+            "driver": driver,
+            "zone": zone,
+            "tickets": self.db.get_tickets_by_driver(driver),
+            "timestamp": time.time()
+        }
+
+        self.kafka_handler.send_msg(msg, self.topic(zone))
+        print(f"[INFO] Enviando historial de tickets de {driver}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_CENTRAL")

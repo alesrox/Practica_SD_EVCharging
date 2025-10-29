@@ -75,6 +75,8 @@ class Kafka_Handler:
                 self.gestor.finalizar_suministro(data)
             elif msg_type == "driver_cp_info":
                 self.gestor.share_cp(data)
+            elif msg_type == "ticket_history":
+                self.gestor.ticket_history(data)
         except Exception as e:
             print(e)
 

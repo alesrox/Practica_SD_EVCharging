@@ -69,3 +69,19 @@ class DataBase:
         conn.commit()
         ticket = f"(Driver: {driver or 'N/A'}, CP: {cp_id}, Total: {total_ticket}€)"
         print(f"[DB] Ticket guardado {ticket}")
+
+    def get_tickets_by_driver(self, driver_id: str):
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT fecha, punto_carga, total
+            FROM tickets
+            WHERE driver_id = ?
+            ORDER BY fecha DESC
+        """, (driver_id,))
+
+        tickets = cursor.fetchall()
+        conn.close()
+
+        return tickets
