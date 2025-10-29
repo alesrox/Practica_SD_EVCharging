@@ -131,6 +131,15 @@ class Engine:
                 self.driver = data.get("driver")
                 self.can_supply = True
                 print(f"[INFO] Ya puede conectar el vehiculo de {self.driver}")
+            elif t == "start_stop_services":
+                if self.status == "PARADO":
+                    self.status = "ACTIVADO"
+                    print("[INFO] Restart services")
+                else:
+                    self.status = "PARADO"
+                    self.can_supply = False
+                    self.driver = None
+                    print("[INFO] Stop services")
 
     def supply_request(self, data):
         c_id = data.get("id")

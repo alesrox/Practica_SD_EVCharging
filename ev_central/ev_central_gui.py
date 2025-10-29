@@ -89,7 +89,9 @@ class EV_Central_UI:
         }
 
     def on_click(self, punto_id):
-        print(f"[CLICK] Punto clickeado: {punto_id}")
+        # TODO: Parar CPs
+        # print(f"[CLICK] Punto clickeado: {punto_id}")
+        self.gestor.parar_cp(punto_id)
 
     def _update_point_frame(self, punto, bg_color):
         frame_data = self.frames[punto.id]

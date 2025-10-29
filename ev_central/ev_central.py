@@ -146,15 +146,32 @@ class EV_Central:
         ]
 
         response = {
+            "id": id,
             "type": "driver_cp_info_resposne",
             "driver": driver,
-            "id": id,
             "info": for_share_cp,
             "timestamp": time.time(),
         }
 
         print(f"[INFO] Enviando CPs disponibles a {driver} ({id})")
         self.kafka_handler.send_msg(response)
+
+    def parar_cp(self, cp_id):
+        if self.charging_points[cp_id].estado == EstadoCP.PARADO:
+            print(f"[INFO] Restableciendo {cp_id}")
+        else:
+            print(f"[INFO] Parando {cp_id}")
+
+        self.actualizar_estado(cp_id, EstadoCP.PARADO)
+
+        msg = {
+            "id": str(uuid.uuid4()),
+            "type": "start_stop_services",
+            "cp": cp_id,
+            "timestamp": time.time()
+        }
+
+        self.kafka_handler.send_msg(msg)
 
     # TOP LEVEL
     def suministrando(self, data):
