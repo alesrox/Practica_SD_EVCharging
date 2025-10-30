@@ -322,6 +322,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Engine de CP")
     parser.add_argument("id", help="ID del Charging Point")
     parser.add_argument("--location", default="Zone 0", help="Ubicación del CP")
+    parser.add_argument("--price", type=float, default=0.6, help="Precio del kWh del CP")
     parser.add_argument("--broker", default="localhost:9092", help="IP de la central")
     parser.add_argument("--port", type=int, default=6001, help="Puerto de escucha del Engine")
     args = parser.parse_args()
@@ -329,6 +330,7 @@ if __name__ == "__main__":
     engine = Engine(
         id=args.id, 
         location=args.location,
+        price=args.price,
         port=args.port,
         broker=args.broker,
     )
