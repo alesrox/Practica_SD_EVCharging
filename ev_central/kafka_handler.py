@@ -1,3 +1,4 @@
+import time
 import json
 
 from concurrent.futures import ThreadPoolExecutor
@@ -12,6 +13,8 @@ class Kafka_Handler:
             "zone1-central-request",
             "zone2-central-request"
         ]
+
+        self._init_time = time.time()
 
         self.consumer = self._crear_consumidor()
         self.producer = self._crear_productor()
@@ -66,6 +69,8 @@ class Kafka_Handler:
     def procesar_msg(self, data):
         try:
             msg_type = data.get("type")
+
+            if data.get("timestamp") < self._init_time: return
 
             if msg_type == "cp_supply_request":
                 self.gestor.procesar_solicitud_cp(data)

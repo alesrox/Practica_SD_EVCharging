@@ -32,6 +32,13 @@ class DataBase:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS drivers (
+                id TEXT PRIMARY KEY,
+                location TEXT NOT NULL
+            )
+        """)
+
         conn.commit()
         conn.close()
 
@@ -55,6 +62,29 @@ class DataBase:
         for row in rows:
             puntos[row[0]] = EV_CP(row[0], row[1], row[2], estado=EstadoCP.DESCONECTADO)
         return puntos
+    
+    def save_driver(self, driver_id, location):
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT OR IGNORE INTO drivers (id, location) VALUES (?, ?)",
+            (driver_id, location)
+        )
+        conn.commit()
+        conn.close()
+
+    def load_drivers(self) -> Dict[str, EV_CP]:
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, location FROM drivers")
+        rows = cursor.fetchall()
+        conn.close()
+
+        drivers = {}
+        for row in rows:
+            drivers[row[0]] = row[1]
+
+        return drivers
     
     def guardar_ticket(self, driver, cp_id, total_ticket):
         conn = sqlite3.connect(self.db_name)

@@ -30,6 +30,9 @@ class Engine:
         self.driver: str = None
         self.status: str = "ACTIVADO"
 
+        self._ticket_id = None
+        self._last_ticket = None
+
         _topic = location.replace(" ", "").lower()
         self.consumer_topic = f"{_topic}-central-response"
         self.producer_topic = f"{_topic}-central-request"
@@ -124,10 +127,6 @@ class Engine:
             finally:
                 self.consumer.close()
 
-    def send_kafka_msg(self, msg):
-        self.producer.produce(self.producer_topic, json.dumps(msg).encode("utf-8"))
-        self.producer.flush(timeout=5)
-
     def _procesar_mensaje(self, data):
         if data.get("cp") == self.id and not self.ko_mode:
             t = data.get("type")
@@ -150,6 +149,12 @@ class Engine:
                     self.can_supply = False
                     self.driver = None
                     print("[INFO] Stop services")
+            elif t == "end_supply_registered":
+                self._loop_confirm_msg = False
+
+    def send_kafka_msg(self, msg):
+        self.producer.produce(self.producer_topic, json.dumps(msg).encode("utf-8"))
+        self.producer.flush(timeout=5)
 
     def supply_request(self, data):
         c_id = data.get("id")
@@ -186,6 +191,7 @@ class Engine:
 
         self.status = "SUMINISTRANDO"
         print("[INFO] SUMINISTRANDO...")
+        self._ticket_id = str(uuid.uuid4())
         self.supply_msg("init_supply")
 
         while self.can_supply and not self.ko_mode:
@@ -198,7 +204,7 @@ class Engine:
             label.config(text=f"Consumo: {self.kwh:.2f} kWh | {_price:.2f}€")
 
             msg = {
-                "id": str(uuid.uuid4()),
+                "id": self._ticket_id,
                 "type": "supply_info",
                 "cp": self.id,
                 "driver": self.driver,
@@ -210,18 +216,20 @@ class Engine:
             
             print(f"[INFO] Consumo: {self.kwh} kWh")
             self.send_kafka_msg(msg)
+            self._last_ticket = (self._ticket_id, self.driver, self.kwh, _price)
             time.sleep(2)
 
         self.supply_msg("end_supply")
         print(f"[INFO] FINALIZADO (Total: {self.kwh:.2f} kWh)")
         self.status = "ACTIVADO"
         label.config(text=f"Consumo: 0.00 kWh | 0.00€")
+        self.end_supply()
         # if label:
         #     label.after(0, lambda: label.config(text=f"Consumo: 0.00 kWh | 0.00€"))
 
     def supply_msg(self, msg_id: str = "init_supply"):
         msg = {
-            "id": str(uuid.uuid4()),
+            "id": self._ticket_id,
             "type": msg_id,
             "cp": self.id,
             "driver": self.driver,
@@ -244,6 +252,30 @@ class Engine:
         self.send_kafka_msg(msg)
         print("[INFO] Solicitando suministraje por interfaz")
 
+    def end_supply(self):
+        self._loop_confirm_msg = True
+        time.sleep(5)
+        while self._loop_confirm_msg:
+            print("[ERROR] No se puedo enviar el ticket a central... Reintentando...")
+
+            msg = {
+                "id": self._last_ticket[0],
+                "type": "end_supply",
+                "cp": self.id,
+                "driver": self._last_ticket[1],
+                "zone": self.location,
+                "consumo": self._last_ticket[2],
+                "total": self._last_ticket[3],
+                "timestamp": time.time()
+            }
+
+            self.send_kafka_msg(msg)
+
+            time.sleep(5)
+
+        print("[INFO] Central recibió el ticket")
+        self._last_ticket = None
+
 def engine_ui(engine: Engine):
     def toggle_ko():
         engine.ko_mode = not engine.ko_mode
@@ -263,9 +295,9 @@ def engine_ui(engine: Engine):
         threading.Thread(target=engine.suministrar, args=(label_consumo,), daemon=True).start()
 
     def desconectar():
+        engine.can_supply = False
         on_button.pack(pady=(5, 10))
         off_button.pack_forget()
-        engine.can_supply = False
 
     root = tk.Tk()
     root.title(f"Engine {engine.id}")
