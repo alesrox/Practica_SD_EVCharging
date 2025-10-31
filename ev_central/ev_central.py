@@ -68,8 +68,10 @@ class EV_Central:
 
                 self.finalizar_suministro(data, True)
 
+            cond_init_su = nuevo_estado == EstadoCP.SUMINISTRANDO and not self.charging_points[id].time
+            self.charging_points[id].time = time.time() if cond_init_su else None
+            
             self.charging_points[id].estado = nuevo_estado
-            self.charging_points[id].time = time.time()
             gestor.last_msg[id] = time.time()
             self._notificar_ui()
 

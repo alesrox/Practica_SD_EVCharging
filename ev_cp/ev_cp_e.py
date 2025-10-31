@@ -222,7 +222,6 @@ class Engine:
 
         self.supply_msg("end_supply")
         print(f"[INFO] FINALIZADO (Total: {self.kwh:.2f} kWh)")
-        self.status = "ACTIVADO"
         label.config(text=f"Consumo: 0.00 kWh | 0.00€")
         self.end_supply()
         # if label:
