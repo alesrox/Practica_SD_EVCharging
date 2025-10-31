@@ -150,6 +150,7 @@ class Engine:
                     self.driver = None
                     print("[INFO] Stop services")
             elif t == "end_supply_registered":
+                print("[INFO] Central recibió el ticket")
                 self._loop_confirm_msg = False
 
     def send_kafka_msg(self, msg):
@@ -253,27 +254,26 @@ class Engine:
         print("[INFO] Solicitando suministraje por interfaz")
 
     def end_supply(self):
-        self._loop_confirm_msg = True
-        time.sleep(5)
-        while self._loop_confirm_msg:
-            print("[ERROR] No se puedo enviar el ticket a central... Reintentando...")
+        # self._loop_confirm_msg = True
+        # time.sleep(5)
+        # while self._loop_confirm_msg:
+        #     print("[ERROR] No se puedo enviar el ticket a central... Reintentando...")
 
-            msg = {
-                "id": self._last_ticket[0],
-                "type": "end_supply",
-                "cp": self.id,
-                "driver": self._last_ticket[1],
-                "zone": self.location,
-                "consumo": self._last_ticket[2],
-                "total": self._last_ticket[3],
-                "timestamp": time.time()
-            }
+        #     msg = {
+        #         "id": self._last_ticket[0],
+        #         "type": "end_supply",
+        #         "cp": self.id,
+        #         "driver": self._last_ticket[1],
+        #         "zone": self.location,
+        #         "consumo": self._last_ticket[2],
+        #         "total": self._last_ticket[3],
+        #         "timestamp": time.time()
+        #     }
 
-            self.send_kafka_msg(msg)
+        #     self.send_kafka_msg(msg)
 
-            time.sleep(5)
+        #     time.sleep(5)
 
-        print("[INFO] Central recibió el ticket")
         self._last_ticket = None
 
 def engine_ui(engine: Engine):
