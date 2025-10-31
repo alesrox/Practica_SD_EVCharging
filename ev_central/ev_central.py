@@ -69,6 +69,7 @@ class EV_Central:
                 self.finalizar_suministro(data, True)
 
             self.charging_points[id].estado = nuevo_estado
+            self.charging_points[id].time = time.time()
             gestor.last_msg[id] = time.time()
             self._notificar_ui()
 
