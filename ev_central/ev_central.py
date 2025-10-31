@@ -23,7 +23,7 @@ class EV_Central:
 
         self.charging_points: Dict[str, EV_CP] = self.db.load_charging_points()
         self.drivers: Dict[str, str] = self.db.load_drivers()
-        self.tickets = []
+        # self.tickets = []
 
         self.socket_handler = Socket_Handler(self, port=port)
         self.kafka_handler = Kafka_Handler(self, broker)
@@ -222,10 +222,10 @@ class EV_Central:
         self._notificar_ui()
 
     def finalizar_suministro(self, data, error=False):
-        id = data.get("id")
-        if id in self.tickets: return
+        # id = data.get("id")
+        # if id in self.tickets: return
 
-        self.tickets.append(id)
+        # self.tickets.append(id)
         cp_id = data.get("cp")
         driver = data.get("driver", None)
         kwh = data.get("consumo")
