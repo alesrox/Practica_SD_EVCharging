@@ -20,6 +20,7 @@ pip install -r requirements.txt
 
 REM ===== Pedir ID =====
 set /p ID=Introduce el ID (por ejemplo MAD1): 
+if "%ID%"=="" set ID=MAD1
 
 REM ===== Ejecutar los scripts en ventanas separadas =====
 echo Iniciando ev_cp_e.py en una nueva ventana...
