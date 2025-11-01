@@ -22,11 +22,14 @@ REM ===== Pedir ID =====
 set /p ID=Introduce el ID (por ejemplo MAD1): 
 if "%ID%"=="" set ID=MAD1
 
+set /p PORT=Introduce el puerto de escucha (por defecto 6001): 
+if "%PORT%"=="" set ID=6001
+
 REM ===== Ejecutar los scripts en ventanas separadas =====
 echo Iniciando ev_cp_e.py en una nueva ventana...
-start "EV_CP_E" cmd /k "python ev_cp/ev_cp_e.py %ID% --broker %HOST_IP%:9092"
+start "EV_CP_E" cmd /k "python ev_cp/ev_cp_e.py %ID% --broker %HOST_IP%:9092 --port %PORT%"
 
 echo Iniciando ev_cp_m.py en una nueva ventana...
-start "EV_CP_M" cmd /k "python ev_cp/ev_cp_m.py %ID% --central %HOST_IP%:6000"
+start "EV_CP_M" cmd /k "python ev_cp/ev_cp_m.py %ID% --central %HOST_IP%:6000 --engine:%PORT%"
 
 echo Todo iniciado correctamente.
