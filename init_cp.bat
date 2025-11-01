@@ -23,7 +23,7 @@ set /p ID=Introduce el ID (por ejemplo MAD1):
 if "%ID%"=="" set ID=MAD1
 
 set /p PORT=Introduce el puerto de escucha (por defecto 6001): 
-if "%PORT%"=="" set ID=6001
+if "%PORT%"=="" set PORT=6001
 
 REM ===== Ejecutar los scripts en ventanas separadas =====
 echo Iniciando ev_cp_e.py en una nueva ventana...
