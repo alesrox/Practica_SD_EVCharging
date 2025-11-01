@@ -30,6 +30,6 @@ echo Iniciando ev_cp_e.py en una nueva ventana...
 start "EV_CP_E" cmd /k "python ev_cp/ev_cp_e.py %ID% --broker %HOST_IP%:9092 --port %PORT%"
 
 echo Iniciando ev_cp_m.py en una nueva ventana...
-start "EV_CP_M" cmd /k "python ev_cp/ev_cp_m.py %ID% --central %HOST_IP%:6000 --engine:%PORT%"
+start "EV_CP_M" cmd /k "python ev_cp/ev_cp_m.py %ID% --central %HOST_IP%:6000 --engine localhost:%PORT%"
 
 echo Todo iniciado correctamente.
