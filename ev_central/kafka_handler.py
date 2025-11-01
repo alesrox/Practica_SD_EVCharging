@@ -67,32 +67,29 @@ class Kafka_Handler:
                 self.consumer.close()
 
     def procesar_msg(self, data):
-        try:
-            msg_type = data.get("type")
+        msg_type = data.get("type")
 
-            if data.get("timestamp") < self._init_time: return
+        if data.get("timestamp") < self._init_time: return
 
-            if msg_type == "cp_supply_request":
-                self.gestor.procesar_solicitud_cp(data)
-            elif msg_type == "driver_supply_request":
-                self.gestor.procesar_solicitud_driver(data)
-            elif msg_type == "supply_response":
-                self.gestor.supply_response(data)
-            elif msg_type == "init_supply":
-                cp_id = data.get("cp")
-                driver = data.get("driver")
-                driver_msg = f"a {driver}" if driver else "desde interfaz"
-                print(f"[INFO] {cp_id} ha comenzado a suministrar {driver_msg}")
-            elif msg_type == "supply_info":
-                self.gestor.suministrando(data)
-            elif msg_type == "end_supply":
-                self.gestor.finalizar_suministro(data)
-            elif msg_type == "driver_cp_info":
-                self.gestor.share_cp(data)
-            elif msg_type == "ticket_history":
-                self.gestor.ticket_history(data)
-        except Exception as e:
-            print(e)
+        if msg_type == "cp_supply_request":
+            self.gestor.procesar_solicitud_cp(data)
+        elif msg_type == "driver_supply_request":
+            self.gestor.procesar_solicitud_driver(data)
+        elif msg_type == "supply_response":
+            self.gestor.supply_response(data)
+        elif msg_type == "init_supply":
+            cp_id = data.get("cp")
+            driver = data.get("driver")
+            driver_msg = f"a {driver}" if driver else "desde interfaz"
+            print(f"[INFO] {cp_id} ha comenzado a suministrar {driver_msg}")
+        elif msg_type == "supply_info":
+            self.gestor.suministrando(data)
+        elif msg_type == "end_supply":
+            self.gestor.finalizar_suministro(data)
+        elif msg_type == "driver_cp_info":
+            self.gestor.share_cp(data)
+        elif msg_type == "ticket_history":
+            self.gestor.ticket_history(data)
 
     def send_msg(self, msg, topic):
         self.producer.produce(topic, json.dumps(msg).encode("utf-8"))

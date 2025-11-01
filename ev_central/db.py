@@ -3,7 +3,7 @@ from typing import Dict
 from datetime import datetime
 from charging_point import EV_CP, EstadoCP
 
-DB_PATH = "EV_CP.db"
+DB_PATH = "EV_DATABASE.db"
 
 class DataBase:
     def __init__(self, db_name=DB_PATH):

@@ -23,7 +23,7 @@ class EV_Central:
 
         self.charging_points: Dict[str, EV_CP] = self.db.load_charging_points()
         self.drivers: Dict[str, str] = self.db.load_drivers()
-        # self.tickets = []
+        self.tickets = []
 
         self.socket_handler = Socket_Handler(self, port=port)
         self.kafka_handler = Kafka_Handler(self, broker)
@@ -54,11 +54,11 @@ class EV_Central:
 
     def actualizar_estado(self, id: str, nuevo_estado: EstadoCP):
         if id in self.charging_points:
+            cp = self.charging_points[id]
             cond_av = nuevo_estado == EstadoCP.AVERIADO
-            cond_su = self.charging_points[id].estado == EstadoCP.SUMINISTRANDO
+            cond_su = cp.estado == EstadoCP.SUMINISTRANDO
             if cond_av and cond_su:
                 print(f"[ERROR] {id} ha caído mientras suministraba")
-                cp = self.charging_points[id]
                 data = {
                     "cp": id,
                     "driver": cp.driver,
@@ -68,8 +68,11 @@ class EV_Central:
 
                 self.finalizar_suministro(data, True)
 
-            cond_init_su = nuevo_estado == EstadoCP.SUMINISTRANDO and not self.charging_points[id].time
-            self.charging_points[id].time = time.time() if cond_init_su else None
+            cond_init_su = nuevo_estado == EstadoCP.SUMINISTRANDO and not cp.time
+            if cond_init_su:
+                self.charging_points[id].time = time.time()
+            elif nuevo_estado == EstadoCP.ACTIVADO:
+                self.charging_points[id].time = None
             
             self.charging_points[id].estado = nuevo_estado
             gestor.last_msg[id] = time.time()
@@ -225,10 +228,11 @@ class EV_Central:
         self._notificar_ui()
 
     def finalizar_suministro(self, data, error=False):
-        # id = data.get("id")
-        # if id in self.tickets: return
+        id = data.get("id")
 
-        # self.tickets.append(id)
+        if id in self.tickets: return
+        self.tickets.append(id)
+
         cp_id = data.get("cp")
         driver = data.get("driver", None)
         kwh = data.get("consumo")

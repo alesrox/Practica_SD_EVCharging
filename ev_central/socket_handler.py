@@ -47,7 +47,7 @@ class Socket_Handler:
                     client.send(b"ERROR - unknown msg")
 
             except Exception as e:
-                # print(f"[SOCKET] Error procesando mensaje: {e}")
+                print(f"[SOCKET] Error procesando mensaje ({msg_type}): {e}")
                 client.send(b"ERROR")
 
     def _handle_auth(self, client, msg):

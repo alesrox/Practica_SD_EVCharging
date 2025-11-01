@@ -254,25 +254,25 @@ class Engine:
         print("[INFO] Solicitando suministraje por interfaz")
 
     def end_supply(self):
-        # self._loop_confirm_msg = True
-        # time.sleep(5)
-        # while self._loop_confirm_msg:
-        #     print("[ERROR] No se puedo enviar el ticket a central... Reintentando...")
+        self._loop_confirm_msg = True
+        time.sleep(10)
+        while self._loop_confirm_msg:
+            print("[ERROR] No se puedo enviar el ticket a central... Reintentando...")
 
-        #     msg = {
-        #         "id": self._last_ticket[0],
-        #         "type": "end_supply",
-        #         "cp": self.id,
-        #         "driver": self._last_ticket[1],
-        #         "zone": self.location,
-        #         "consumo": self._last_ticket[2],
-        #         "total": self._last_ticket[3],
-        #         "timestamp": time.time()
-        #     }
+            msg = {
+                "id": self._last_ticket[0],
+                "type": "end_supply",
+                "cp": self.id,
+                "driver": self._last_ticket[1],
+                "zone": self.location,
+                "consumo": self._last_ticket[2],
+                "total": self._last_ticket[3],
+                "timestamp": time.time()
+            }
 
-        #     self.send_kafka_msg(msg)
+            self.send_kafka_msg(msg)
 
-        #     time.sleep(5)
+            time.sleep(10)
 
         self._last_ticket = None
 
