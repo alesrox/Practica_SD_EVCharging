@@ -30,6 +30,8 @@ class Engine:
         self.driver: str = None
         self.status: str = "ACTIVADO"
 
+        self.ui_off_btn = None
+
         self._ticket_id = None
         self._last_ticket = None
 
@@ -147,6 +149,7 @@ class Engine:
                 else:
                     self.status = "PARADO"
                     self.can_supply = False
+                    self.ui_off_btn()
                     print("[INFO] Stop services")
             elif t == "end_supply_registered":
                 print("[INFO] Central recibió el ticket")
@@ -295,8 +298,13 @@ def engine_ui(engine: Engine):
 
     def desconectar():
         engine.can_supply = False
+        quitar_btn_off()
+
+    def quitar_btn_off():
         on_button.pack(pady=(5, 10))
         off_button.pack_forget()
+
+    engine.ui_off_btn = quitar_btn_off
 
     root = tk.Tk()
     root.title(f"Engine {engine.id}")
