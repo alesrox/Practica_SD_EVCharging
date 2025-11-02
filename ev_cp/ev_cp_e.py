@@ -221,7 +221,7 @@ class Engine:
             time.sleep(2)
 
         self.supply_msg("end_supply")
-        self.status = "ACTIVADO"
+        if self.status != "PARADO": self.status = "ACTIVADO"
         print(f"[INFO] FINALIZADO (Total: {self.kwh:.2f} kWh)")
         label.config(text=f"Consumo: 0.00 kWh | 0.00€")
         self.end_supply()
