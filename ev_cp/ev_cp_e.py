@@ -147,7 +147,6 @@ class Engine:
                 else:
                     self.status = "PARADO"
                     self.can_supply = False
-                    self.driver = None
                     print("[INFO] Stop services")
             elif t == "end_supply_registered":
                 print("[INFO] Central recibió el ticket")
