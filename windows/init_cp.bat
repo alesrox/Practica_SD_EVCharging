@@ -1,4 +1,5 @@
 @echo off
+cd ..
 setlocal enabledelayedexpansion
 
 REM ===== Cargar variable HOST_IP desde .env =====

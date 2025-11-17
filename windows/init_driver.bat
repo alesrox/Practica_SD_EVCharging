@@ -1,4 +1,5 @@
 @echo off
+cd ..
 setlocal enabledelayedexpansion
 
 REM ===== Cargar variable HOST_IP desde .env =====
@@ -35,4 +36,3 @@ if not "%FILE%"=="" (
 )
 
 echo Todo iniciado correctamente.
-pause

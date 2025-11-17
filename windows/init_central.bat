@@ -1,3 +1,5 @@
+@echo off
+cd ..
 docker compose up -d --build
 pip install -r requirements.txt
 python topics.py
