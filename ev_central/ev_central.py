@@ -18,11 +18,10 @@ class EV_Central:
         port: int = 6000
     ):
         self.db = db.DataBase()
+        self.db.reset_all_charging_points()
         self.last_msg: Dict[str, float] = {}
         self.ui_callback = ui_callback
 
-        self.charging_points: Dict[str, EV_CP] = self.db.load_charging_points()
-        self.drivers: Dict[str, str] = self.db.load_drivers()
         self.tickets = []
 
         self.socket_handler = Socket_Handler(self, port=port)
@@ -30,53 +29,58 @@ class EV_Central:
 
     def _notificar_ui(self):
         if self.ui_callback:
-            self.ui_callback(self.charging_points)
+            self.ui_callback(self.db.load_charging_points())
 
     def check_timeouts(self, timeout=5):
         while True:
             now = time.time()
-            for id, last in self.last_msg.items():
+            for cp_id, last in self.last_msg.items():
                 if now - last > timeout:
-                    if self.charging_points[id].estado != EstadoCP.DESCONECTADO:
-                        self.charging_points[id].estado = EstadoCP.DESCONECTADO
+                    cp = self.db.get_charging_point(cp_id)
+                    if cp is None:
+                        continue
+                    
+                    if cp.estado != EstadoCP.DESCONECTADO:
+                        self.db.update_estado(cp_id, EstadoCP.DESCONECTADO.value)
                         self._notificar_ui()
             time.sleep(1)
 
     def registrar_punto(self, id: str, msg: dict):
         punto = EV_CP(id, msg["location"], msg["price"], EstadoCP.DESCONECTADO)
 
-        self.charging_points[id] = punto
         self.db.save_charging_points(punto)
         gestor.last_msg[id] = time.time()
-
-        self.charging_points[id].estado = EstadoCP.ACTIVADO
+        self.db.update_estado(punto, EstadoCP.ACTIVADO)
+        
         self._notificar_ui()
 
     def actualizar_estado(self, id: str, nuevo_estado: EstadoCP):
-        if id in self.charging_points:
-            cp = self.charging_points[id]
-            cond_av = nuevo_estado == EstadoCP.AVERIADO
-            cond_su = cp.estado == EstadoCP.SUMINISTRANDO
-            if cond_av and cond_su:
-                print(f"[ERROR] {id} ha caído mientras suministraba")
-                data = {
-                    "cp": id,
-                    "driver": cp.driver,
-                    "consumo": cp.kwh,
-                    "zone": cp.location
-                }
+        cp = self.db.get_charging_point(id)
+        if cp is None: return
 
-                self.finalizar_suministro(data, True)
+        cond_av = nuevo_estado == EstadoCP.AVERIADO
+        cond_su = cp.estado == EstadoCP.SUMINISTRANDO
 
-            cond_init_su = nuevo_estado == EstadoCP.SUMINISTRANDO and not cp.time
-            if cond_init_su:
-                self.charging_points[id].time = time.time()
-            elif nuevo_estado == EstadoCP.ACTIVADO:
-                self.charging_points[id].time = None
-            
-            self.charging_points[id].estado = nuevo_estado
-            gestor.last_msg[id] = time.time()
-            self._notificar_ui()
+        if cond_av and cond_su:
+            data = {
+                "cp": id,
+                "driver": cp.driver,
+                "consumo": cp.kwh,
+                "zone": cp.location
+            }
+            self.finalizar_suministro(data, True)
+
+        cond_init_su = nuevo_estado == EstadoCP.SUMINISTRANDO and not cp.time
+        if cond_init_su:
+            cp.time = time.time()
+            self.db.start_time(id, cp.time)
+        elif nuevo_estado == EstadoCP.ACTIVADO:
+            cp.time = None
+            self.db.start_time(id, None)
+
+        self.db.update_estado(cp, nuevo_estado)
+        gestor.last_msg[id] = time.time()
+        self._notificar_ui()
 
     def topic(self, zone):
         _zone = zone.replace(" ", "").lower()
@@ -88,7 +92,7 @@ class EV_Central:
         zone=data.get("zone")
         
         print(f"[INFO] Solicitud de suministro recibida de {cp_id} ({id})")
-        cp = self.charging_points[cp_id]
+        cp = self.db.get_charging_point(cp_id)
         status = "approved" if cp.can_supply() else "denied"
 
         response = {
@@ -108,11 +112,13 @@ class EV_Central:
         cp_id = data.get("cp")
         driver = data.get("driver")
         zone = data.get("zone")
-        self.drivers[driver] = zone
+
         self.db.save_driver(driver, zone)
 
         print(f"[INFO] {driver} ha solicitado recargar en {cp_id} ({id})")
-        cp = self.charging_points.get(cp_id, None)
+
+        cp = self.db.get_charging_point(cp_id)
+
         msg = {
             "id": id,
             "type": "supply_request",
@@ -123,25 +129,17 @@ class EV_Central:
             "timestamp": time.time()
         }
 
-        if not cp:
+        if cp is None:
             print(f"[INFO] {cp_id} no está registrado")
         elif cp.can_supply():
             print(f"[INFO] El CP {cp_id} está Operativo. Comprobando disponibilidad...")
-            msg = {
-                "id": id,
-                "type": "supply_request",
-                "status": "aceptada",
-                "cp": cp_id,
-                "driver": driver,
-                "zone": zone,
-                "timestamp": time.time()
-            }
+            msg["status"] = "aceptada"
 
             if zone != cp.location:
                 self.kafka_handler.send_msg(msg, self.topic(cp.location))
         else:
             print(f"[INFO] {cp_id} no disponible: Solicitud denegada ({id})")
-        
+
         self.kafka_handler.send_msg(msg, self.topic(zone))
 
     def supply_response(self, data):
@@ -163,7 +161,7 @@ class EV_Central:
             "timestamp": time.time()
         }
 
-        cp = self.charging_points[cp_id]
+        cp = self.db.get_charging_point(cp_id)
         if zone != cp.location:
             self.kafka_handler.send_msg(response, self.topic(cp.location))
 
@@ -176,9 +174,10 @@ class EV_Central:
 
         print(f"[INFO] {driver} ha solicitado los CP disponibles en {zone} ({id})")
 
+        all_cps = self.db.load_charging_points()
         for_share_cp = [
-            cp_id for cp_id, punto in self.charging_points.items()
-            if punto.estado == EstadoCP.ACTIVADO and punto.location == zone
+            cp_id for cp_id, cp in all_cps.items()
+            if cp.estado == EstadoCP.ACTIVADO and cp.location == zone
         ]
 
         response = {
@@ -194,13 +193,19 @@ class EV_Central:
         self.kafka_handler.send_msg(response, self.topic(zone))
 
     def parar_cp(self, cp_id):
-        if self.charging_points[cp_id].estado == EstadoCP.PARADO:
+        cp = self.db.get_charging_point(cp_id)
+        if cp is None:
+            print(f"[ERROR] Punto de carga {cp_id} no encontrado")
+            return
+
+        if cp.estado == EstadoCP.PARADO:
             print(f"[INFO] Restableciendo {cp_id}")
         else:
             print(f"[INFO] Parando {cp_id}")
 
         self.actualizar_estado(cp_id, EstadoCP.PARADO)
-        zone = self.charging_points[cp_id].location
+
+        zone = cp.location
         msg = {
             "id": str(uuid.uuid4()),
             "type": "start_stop_services",
@@ -216,36 +221,54 @@ class EV_Central:
         cp_id = data.get("cp")
         driver = data.get("driver")
         kwh = float(data.get("consumo"))
-        price = self.charging_points[cp_id].price
 
-        self.charging_points[cp_id].driver = driver
-        self.charging_points[cp_id].kwh = kwh
-        self.charging_points[cp_id].ticket = round(kwh * price, 2)
+        cp = self.db.get_charging_point(cp_id)
+        if cp is None:
+            print(f"[ERROR] Punto de carga {cp_id} no encontrado")
+            return
+
+        cp.driver = driver
+        cp.kwh = kwh
+        cp.ticket = round(kwh * cp.price, 2)
+
+        self.db.set_driver(cp_id, driver)
+        self.db.update_kwh(cp_id, kwh)
 
         driver_msg = f"a {driver}" if driver else ""
         print(f"[INFO] {cp_id} ha suministrado {kwh} kWh {driver_msg}")
-        if driver: self.kafka_handler.send_msg(data, self.topic(self.drivers[driver]))
+
+        if driver:
+            zone = self.db.load_drivers().get(driver, None)
+            if zone:
+                self.kafka_handler.send_msg(data, self.topic(zone))
+
         self._notificar_ui()
 
     def finalizar_suministro(self, data, error=False):
         id = data.get("id")
 
-        if id in self.tickets: return
+        if id in self.tickets:
+            return
         self.tickets.append(id)
 
         cp_id = data.get("cp")
         driver = data.get("driver", None)
         kwh = data.get("consumo")
-        price = self.charging_points[cp_id].price
 
-        total_ticket = round(kwh * price, 2)
+        cp = self.db.get_charging_point(cp_id)
+        if cp is None:
+            print(f"[ERROR] Punto de carga {cp_id} no encontrado")
+            return
+
+        total_ticket = round(kwh * cp.price, 2)
         if error:
             print(f"[INFO] {cp_id} ha finalizado debido a una averia ({kwh} kWh): {total_ticket}€")
         else:
             print(f"[INFO] {cp_id} ha finalizado ({kwh} kWh): {total_ticket}€")
 
         if driver:
-            zone = self.drivers[driver]
+            drivers_zone = self.db.load_drivers()
+            zone = drivers_zone.get(driver, None)
 
             ticket = {
                 "id": id,
@@ -258,13 +281,14 @@ class EV_Central:
             }
 
             print(f"[INFO] Enviando ticket a {driver}")
-            self.kafka_handler.send_msg(ticket, self.topic(zone))
-        
+            if zone:
+                self.kafka_handler.send_msg(ticket, self.topic(zone))
+
         self.db.guardar_ticket(driver, cp_id, total_ticket)
-        
+
         if not error:
             msg = {
-                "id": data.get("id"),
+                "id": id,
                 "type": "end_supply_registered",
                 "cp": cp_id,
                 "timestamp": time.time()
@@ -279,12 +303,14 @@ class EV_Central:
 
         print(f"[INFO] {driver} ha solicitado su historial de tickets")
 
+        tickets = self.db.get_tickets_by_driver(driver)
+
         msg = {
             "id": id,
             "type": "ticket_history_response",
             "driver": driver,
             "zone": zone,
-            "tickets": self.db.get_tickets_by_driver(driver),
+            "tickets": tickets,
             "timestamp": time.time()
         }
 

@@ -57,7 +57,7 @@ class EV_Central_UI:
 
         # --- Diccionario de frames de CPs ---
         self.frames = {}
-        self.update_ev_cp(self.gestor.charging_points)
+        self.update_ev_cp(self.gestor.db.load_charging_points())
 
     # ------------------- ACTUALIZACIÓN DE CPs -------------------
     def update_ev_cp(self, charging_points):
