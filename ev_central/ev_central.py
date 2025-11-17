@@ -115,7 +115,7 @@ class EV_Central:
         cp = self.charging_points.get(cp_id, None)
         msg = {
             "id": id,
-            "type": "start_supply",
+            "type": "supply_request",
             "status": "denegada",
             "driver": driver,
             "cp": cp_id,

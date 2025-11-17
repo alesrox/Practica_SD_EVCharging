@@ -70,9 +70,9 @@ class Driver:
 
         check_id = data.get("id") in self.unresponsed["driver_cp_info"]
         if t == "driver_cp_info_resposne" and check_id:
-                self.unresponsed["driver_cp_info"].clear()
-                self.waiting = True
-                self.show_cp(data)
+            self.unresponsed["driver_cp_info"].clear()
+            self.waiting = True
+            self.show_cp(data)
 
         if not self.waiting: return
 
@@ -82,6 +82,7 @@ class Driver:
                 print(f"[INFO] Surtidor {data.get('cp')} disponible para suministro.")
             else:
                 print(f"[INFO] Suministro con {data.get('cp')}: solicitud denegada")
+                self.ask_for_cp()
         elif t == "start_supply":
             cp = data.get("cp")
             if data.get("status") == "aceptada":
@@ -177,11 +178,57 @@ class Driver:
 
     def show_cp(self, data):
         info = data.get("info", [])
-        print(f"\nPuntos de carga disponibles en {self.location}:")
-        for cp_id in info:
-            print(f"  - CP: {cp_id}")
         
-        self.get_cp()
+        while True:
+            if not info:
+                print(f"\nNo hay puntos de carga disponibles en {self.location}.")
+            else:
+                print(f"\nPuntos de carga disponibles en {self.location}:")
+                for cp_id in info:
+                    print(f"  - CP: {cp_id}")
+            
+            cmd = input(
+                "\nIntroduce CP (id), 'r' recargar, 'h' historial, 'q' salir: "
+            )
+
+            # --- Salir ---
+            if cmd == "q":
+                self.exit = True
+                break
+
+            # --- Recargar vista ---
+            if cmd == "r":
+                self.ask_for_cp()
+                break
+
+            # --- Historial ---
+            if cmd == "h":
+                self.get_history()
+                break
+
+            # --- Solicitar carga ---
+            if cmd:
+                self._handle_charge_request(cmd)
+                break
+
+    def _handle_charge_request(self, cp_id):
+        print(f"\nSolicitando carga en CP: {cp_id}...")
+        self.solicitar_carga(cp_id)
+        time.sleep(5)
+
+        # Reintentos si sigue sin respuesta
+        retries = 0
+        max_retries = 3
+
+        while self.unresponsed["driver_supply_request"]:
+            retries += 1
+            if retries > max_retries:
+                print("[ERROR] Tiempo de espera agotado. No se obtuvo respuesta del servidor.")
+                return
+
+            print(f"[Aviso] Sin respuesta, reintentando... ({retries}/{max_retries})")
+            self.solicitar_carga(cp_id)
+            time.sleep(5)
 
     def get_history(self):
         msg = {
@@ -208,24 +255,6 @@ class Driver:
             print(f"  • Fecha: {fecha} | Punto de carga: {punto_carga} | Total: {total}€")
 
         print(f"[INFO] Total de tickets: {len(tickets)}\n")
-
-    def get_cp(self):
-        cmd = input("\nIntroduce CP (id), 'r' recargar, 'h' historial, 'q' salir: ").strip()
-        if cmd == "q":
-            self.exit = True
-        elif cmd == "r":
-            self.ask_for_cp()
-        elif cmd == "h":
-            self.get_history() 
-        elif cmd:
-            self.solicitar_carga(cmd)
-            time.sleep(5)
-            while self.unresponsed["driver_supply_request"] != []:
-                print("[ERROR] Tiempo de espera agotado (2)")
-                self.solicitar_carga(cmd)
-                time.sleep(5)
-        else:
-            self.get_cp()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_DRIVER")
