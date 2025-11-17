@@ -39,32 +39,11 @@ echo "  FILE: $FILE"
 echo "  HOST_IP: $HOST_IP"
 echo
 
-
-# ===== Función para lanzar nueva ventana =====
-run_in_new_terminal() {
-    CMD=$1
-
-    if command -v gnome-terminal >/dev/null 2>&1; then
-        gnome-terminal -- bash -c "$CMD; exec bash"
-    elif command -v xterm >/dev/null 2>&1; then
-        xterm -hold -e "$CMD"
-    elif command -v konsole >/dev/null 2>&1; then
-        konsole -e bash -c "$CMD; exec bash"
-    else
-        echo "[AVISO] No se encontró terminal gráfica. Ejecutando en background."
-        bash -c "$CMD" &
-    fi
-}
-
-
 # ===== Ejecutar el script driver =====
 if [ -n "$FILE" ]; then
     echo "Iniciando ev_driver.py con archivo en nueva ventana..."
-    run_in_new_terminal "python ev_driver/ev_driver.py $ID --broker $HOST_IP:9092 --file $FILE"
+    python3.11 ev_driver/ev_driver.py $ID --broker $HOST_IP:9092 --file $FILE
 else
     echo "Iniciando ev_driver.py sin archivo en nueva ventana..."
-    run_in_new_terminal "python ev_driver/ev_driver.py $ID --broker $HOST_IP:9092"
+    python3.11 ev_driver/ev_driver.py $ID --broker $HOST_IP:9092
 fi
-
-
-echo "Todo iniciado correctamente."
