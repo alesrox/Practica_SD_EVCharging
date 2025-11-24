@@ -1,0 +1,3 @@
+MAD1 = Madrid
+MAD2 = Alicante
+MAD3 = Orihuela
