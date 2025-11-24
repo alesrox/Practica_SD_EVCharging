@@ -6,7 +6,7 @@ import argparse
 import threading
 
 from db import EVCentralAPI
-from charging_point import EV_CP, EstadoCP
+from charging_point import EstadoCP
 from ev_central_gui import EV_Central_UI
 from kafka_handler import Kafka_Handler
 from socket_handler import Socket_Handler
@@ -42,17 +42,27 @@ class EV_Central:
                     if cp is None:
                         continue
                     
-                    if cp.estado != EstadoCP.DESCONECTADO:
+                    if cp["estado"] != EstadoCP.DESCONECTADO:
                         self.db.update_estado(cp_id, EstadoCP.DESCONECTADO.value)
                         self._notificar_ui()
             time.sleep(1)
 
     def registrar_punto(self, id: str, msg: dict):
-        punto = EV_CP(id, msg["location"], msg["price"], EstadoCP.DESCONECTADO)
+        punto = {
+            "id": id,
+            "location": msg["location"],
+            "price": msg["price"],
+            "estado": EstadoCP.DESCONECTADO.value,
+            "driver": None,
+            "kwh": 0,
+            "time": None,
+            "auth_key": None,
+            "session_key": None
+        }
 
-        self.db.save_charging_point(punto.as_dict())
+        self.db.save_charging_point(punto)
         gestor.last_msg[id] = time.time()
-        self.db.update_estado(punto.id, EstadoCP.ACTIVADO.value)
+        self.db.update_estado(punto["id"], EstadoCP.ACTIVADO.value)
         
         self._notificar_ui()
 
@@ -61,26 +71,26 @@ class EV_Central:
         if cp is None: return
 
         cond_av = nuevo_estado == EstadoCP.AVERIADO
-        cond_su = cp.estado == EstadoCP.SUMINISTRANDO
+        cond_su = cp["estado"] == EstadoCP.SUMINISTRANDO
 
         if cond_av and cond_su:
             data = {
                 "cp": id,
-                "driver": cp.driver,
-                "consumo": cp.kwh,
-                "zone": cp.location
+                "driver": cp["driver"],
+                "consumo": cp["kwh"],
+                "zone": cp["location"]
             }
             self.finalizar_suministro(data, True)
 
-        cond_init_su = nuevo_estado == EstadoCP.SUMINISTRANDO and not cp.time
+        cond_init_su = nuevo_estado == EstadoCP.SUMINISTRANDO and not cp["time"]
         if cond_init_su:
-            cp.time = time.time()
-            self.db.start_time(id, cp.time)
+            cp["time"] = time.time()
+            self.db.start_time(id, cp["time"])
         elif nuevo_estado == EstadoCP.ACTIVADO:
-            cp.time = None
+            cp["time"] = None
             self.db.start_time(id, None)
 
-        self.db.update_estado(cp.id, nuevo_estado.value)
+        self.db.update_estado(cp["id"], nuevo_estado.value)
         gestor.last_msg[id] = time.time()
         self._notificar_ui()
 
@@ -95,7 +105,7 @@ class EV_Central:
         
         print(f"[INFO] Solicitud de suministro recibida de {cp_id} ({id})")
         cp = self.db.get_charging_point(cp_id)
-        status = "approved" if cp.can_supply() else "denied"
+        status = "approved" if cp["estado"] == EstadoCP.ACTIVADO else "denied"
 
         response = {
             "id": id,
@@ -133,12 +143,12 @@ class EV_Central:
 
         if cp is None:
             print(f"[INFO] {cp_id} no está registrado")
-        elif cp.can_supply():
+        elif cp["estado"] == EstadoCP.ACTIVADO:
             print(f"[INFO] El CP {cp_id} está Operativo. Comprobando disponibilidad...")
             msg["status"] = "aceptada"
 
-            if zone != cp.location:
-                self.kafka_handler.send_msg(msg, self.topic(cp.location))
+            if zone != cp["location"]:
+                self.kafka_handler.send_msg(msg, self.topic(cp["location"]))
         else:
             print(f"[INFO] {cp_id} no disponible: Solicitud denegada ({id})")
 
@@ -164,8 +174,8 @@ class EV_Central:
         }
 
         cp = self.db.get_charging_point(cp_id)
-        if zone != cp.location:
-            self.kafka_handler.send_msg(response, self.topic(cp.location))
+        if zone != cp["location"]:
+            self.kafka_handler.send_msg(response, self.topic(cp["location"]))
 
         self.kafka_handler.send_msg(response, self.topic(zone))
 
@@ -179,7 +189,7 @@ class EV_Central:
         all_cps = self.db.load_charging_points()
         for_share_cp = [
             cp_id for cp_id, cp in all_cps.items()
-            if cp.estado == EstadoCP.ACTIVADO and cp.location == zone
+            if cp["estado"] == EstadoCP.ACTIVADO and cp["location"] == zone
         ]
 
         response = {
@@ -200,14 +210,14 @@ class EV_Central:
             print(f"[ERROR] Punto de carga {cp_id} no encontrado")
             return
 
-        if cp.estado == EstadoCP.PARADO:
+        if cp["estado"] == EstadoCP.PARADO:
             print(f"[INFO] Restableciendo {cp_id}")
         else:
             print(f"[INFO] Parando {cp_id}")
 
         self.actualizar_estado(cp_id, EstadoCP.PARADO)
 
-        zone = cp.location
+        zone = cp["location"]
         msg = {
             "id": str(uuid.uuid4()),
             "type": "start_stop_services",
@@ -229,9 +239,9 @@ class EV_Central:
             print(f"[ERROR] Punto de carga {cp_id} no encontrado")
             return
 
-        cp.driver = driver
-        cp.kwh = kwh
-        cp.ticket = round(kwh * cp.price, 2)
+        cp["driver"] = driver
+        cp["kwh"] = kwh
+        cp["ticket"] = round(kwh * cp["price"], 2)
 
         self.db.set_driver(cp_id, driver)
         self.db.update_kwh(cp_id, kwh)
@@ -262,7 +272,7 @@ class EV_Central:
             print(f"[ERROR] Punto de carga {cp_id} no encontrado")
             return
 
-        total_ticket = round(kwh * cp.price, 2)
+        total_ticket = round(kwh * cp["price"], 2)
         if error:
             print(f"[INFO] {cp_id} ha finalizado debido a una averia ({kwh} kWh): {total_ticket}€")
         else:

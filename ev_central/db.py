@@ -1,6 +1,5 @@
 import requests
 from typing import Dict, Any, Optional
-from charging_point import dict_to_ev_cp
 
 class EVCentralAPI:
     def __init__(self, server_url: str = "http://localhost:9000"):
@@ -10,16 +9,14 @@ class EVCentralAPI:
     def load_charging_points(self) -> Dict[str, Any]:
         resp = requests.get(f"{self.server_url}/charging_points")
         resp.raise_for_status()
-        data = resp.json()
-        return {cp_id: dict_to_ev_cp(cp_dict) for cp_id, cp_dict in data.items()}
+        return resp.json()
 
     def get_charging_point(self, cp_id: str) -> Optional[Dict[str, Any]]:
         resp = requests.get(f"{self.server_url}/charging_point/{cp_id}")
         if resp.status_code == 404:
             resp.raise_for_status()
         resp.raise_for_status()
-        cp_dict = resp.json()
-        return dict_to_ev_cp(cp_dict)
+        return resp.json()
 
     def save_charging_point(self, cp: Dict[str, Any]):
         resp = requests.post(f"{self.server_url}/charging_point/save", json=cp)

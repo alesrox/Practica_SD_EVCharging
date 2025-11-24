@@ -1,7 +1,7 @@
 import sqlite3
-from typing import Dict
+from typing import Dict, Optional
 from datetime import datetime
-from db.charging_point import EV_CP, EstadoCP
+from db.charging_point import EstadoCP   
 
 DB_PATH = "EV_DATABASE.db"
 
@@ -63,7 +63,8 @@ class DataBase:
         conn.commit()
         conn.close()
 
-    def save_charging_points(self, punto: EV_CP, auth_key: str = None, session_key: str = None):
+    def save_charging_point(self, cp: Dict):
+        """cp es un dict con los campos del punto de carga"""
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
         cursor.execute("""
@@ -71,15 +72,20 @@ class DataBase:
             (id, location, price, estado, driver, kwh, time, auth_key, session_key)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            punto.id, punto.location, punto.price,
-            punto.estado.value, punto.driver,
-            punto.kwh, punto.time,
-            auth_key, session_key
+            cp["id"],
+            cp["location"],
+            cp.get("price", 0.6),
+            cp.get("estado", EstadoCP.DESCONECTADO.value),
+            cp.get("driver"),
+            cp.get("kwh", 0),
+            cp.get("time"),
+            cp.get("auth_key"),
+            cp.get("session_key"),
         ))
         conn.commit()
         conn.close()
 
-    def get_charging_point(self, cp_id) -> EV_CP | None:
+    def get_charging_point(self, cp_id: str) -> Optional[Dict]:
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
         cursor.execute("""
@@ -89,24 +95,23 @@ class DataBase:
         """, (cp_id,))
         row = cursor.fetchone()
         conn.close()
+
         if row is None:
             return None
-        estado_enum = EstadoCP(row[3])
-        cp = EV_CP(
-            id=row[0],
-            location=row[1],
-            price=row[2],
-            estado=estado_enum,
-            driver=row[4],
-            kwh=row[5] if row[5] is not None else 0,
-            ticket=0,
-            auth_key=row[7],
-            session_key=row[8]
-        )
-        cp.time = row[6]
-        return cp
+        
+        return {
+            "id": row[0],
+            "location": row[1],
+            "price": row[2],
+            "estado": row[3],
+            "driver": row[4],
+            "kwh": row[5] if row[5] is not None else 0,
+            "time": row[6],
+            "auth_key": row[7],
+            "session_key": row[8]
+        }
 
-    def load_charging_points(self) -> Dict[str, EV_CP]:
+    def load_charging_points(self) -> Dict[str, Dict]:
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
         cursor.execute("""
@@ -115,23 +120,23 @@ class DataBase:
         """)
         rows = cursor.fetchall()
         conn.close()
+
         puntos = {}
         for row in rows:
-            cp = EV_CP(
-                id=row[0],
-                location=row[1],
-                price=row[2],
-                estado=EstadoCP(row[3]),
-                driver=row[4],
-                kwh=row[5] if row[5] is not None else 0,
-                auth_key=row[7],
-                session_key=row[8]
-            )
-            cp.time = row[6]
-            puntos[row[0]] = cp
+            puntos[row[0]] = {
+                "id": row[0],
+                "location": row[1],
+                "price": row[2],
+                "estado": row[3],
+                "driver": row[4],
+                "kwh": row[5] if row[5] is not None else 0,
+                "time": row[6],
+                "auth_key": row[7],
+                "session_key": row[8]
+            }
         return puntos
 
-    def save_driver(self, driver_id, location):
+    def save_driver(self, driver_id: str, location: str):
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
         cursor.execute(
@@ -147,20 +152,19 @@ class DataBase:
         cursor.execute("SELECT id, location FROM drivers")
         rows = cursor.fetchall()
         conn.close()
-        drivers = {row[0]: row[1] for row in rows}
-        return drivers
+        return {row[0]: row[1] for row in rows}
 
-    def update_estado(self, cp: EV_CP | str, nuevo_estado: EstadoCP):
-        cp_id = cp.id if isinstance(cp, EV_CP) else cp
+    def update_estado(self, cp_id: str, nuevo_estado: EstadoCP | str):
+        if isinstance(nuevo_estado, EstadoCP):
+            nuevo_estado = nuevo_estado.value
+
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
-        cursor.execute("UPDATE puntos_carga SET estado = ? WHERE id = ?", (nuevo_estado.value, cp_id))
+        cursor.execute("UPDATE puntos_carga SET estado = ? WHERE id = ?", (nuevo_estado, cp_id))
         conn.commit()
         conn.close()
-        if isinstance(cp, EV_CP):
-            cp.estado = nuevo_estado
 
-    def set_driver(self, cp_id: str, driver: str | None):
+    def set_driver(self, cp_id: str, driver: Optional[str]):
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
         cursor.execute("UPDATE puntos_carga SET driver = ? WHERE id = ?", (driver, cp_id))
@@ -174,7 +178,7 @@ class DataBase:
         conn.commit()
         conn.close()
 
-    def start_time(self, cp_id: str, timestamp: float | None):
+    def start_time(self, cp_id: str, timestamp: Optional[float]):
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
         cursor.execute("UPDATE puntos_carga SET time = ? WHERE id = ?", (timestamp, cp_id))

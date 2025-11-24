@@ -2,24 +2,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from db.database import DataBase
-from db.charging_point import EV_CP, EstadoCP
 
 app = FastAPI()
 db = DataBase()
-
-# --- Helpers ---
-def cp_to_dict(cp: EV_CP) -> Dict[str, Any]:
-    return {
-        "id": cp.id,
-        "location": cp.location,
-        "price": cp.price,
-        "estado": cp.estado.value,
-        "driver": cp.driver,
-        "kwh": cp.kwh,
-        "time": cp.time,
-        "auth_key": cp.auth_key,
-        "session_key": cp.session_key
-    }
 
 # --- Pydantic Models ---
 class ChargingPointModel(BaseModel):
@@ -30,6 +15,8 @@ class ChargingPointModel(BaseModel):
     driver: Optional[str] = None
     kwh: Optional[float] = 0
     time: Optional[float] = None
+    auth_key: Optional[str] = None
+    session_key: Optional[str] = None
 
 class EstadoModel(BaseModel):
     cp_id: str
@@ -59,29 +46,19 @@ class TicketModel(BaseModel):
 # --- Endpoints ---
 @app.get("/charging_points")
 def get_all_charging_points():
-    puntos = db.load_charging_points()
-    return {cp_id: cp_to_dict(cp) for cp_id, cp in puntos.items()}
+    return db.load_charging_points()
 
 @app.get("/charging_point/{cp_id}")
 def get_charging_point(cp_id: str):
     cp = db.get_charging_point(cp_id)
     if cp is None:
         raise HTTPException(status_code=404, detail="Charging point not found")
-    return cp_to_dict(cp)
+    return cp
 
 @app.post("/charging_point/save")
 def save_charging_point(data: ChargingPointModel):
-    punto = EV_CP(
-        id=data.id,
-        location=data.location,
-        price=data.price,
-        estado=EstadoCP(data.estado),
-        driver=data.driver,
-        kwh=data.kwh,
-        ticket=0
-    )
-    punto.time = data.time
-    db.save_charging_points(punto)
+    cp_dict = data.model_dump()
+    db.save_charging_point(cp_dict)
     return {"ok": True}
 
 @app.post("/charging_points/reset")
@@ -91,7 +68,7 @@ def reset_all():
 
 @app.post("/charging_point/estado")
 def update_estado(data: EstadoModel):
-    db.update_estado(data.cp_id, EstadoCP(data.estado))
+    db.update_estado(data.cp_id, data.estado)
     return {"ok": True}
 
 @app.post("/charging_point/set_driver")
@@ -127,6 +104,6 @@ def save_ticket(data: TicketModel):
 def tickets_by_driver(driver_id: str):
     tickets = db.get_tickets_by_driver(driver_id)
     return [
-        {"fecha": t[0], "punto_carga": t[1], "total": t[2]}
+        { "fecha": t[0], "punto_carga": t[1], "total": t[2] }
         for t in tickets
     ]
