@@ -14,6 +14,10 @@ from pydantic import BaseModel
 # Cliente HTTP Asíncrono (El sustituto de requests para FastAPI)
 import httpx
 
+# Bloqueo para acceso seguro a datos compartidos
+data_lock = threading.Lock()
+
+# Diccionario para almacenar las asociaciones de Charging Points y ciudades
 ciudades_cp: Dict[str, str] = {}
 
 def cambiar_ciudad():
@@ -23,14 +27,14 @@ def cambiar_ciudad():
     nueva_ciudad = input("Introduce la nueva ciudad para el Charging Point: ")
 
     if charging_point in ciudades_cp:
-        with threading.Lock():
+        with data_lock:
             ciudades_cp[charging_point] = nueva_ciudad
         print(f"Ciudad del Charging Point {charging_point} actualizada a {nueva_ciudad}.")
     else:
         print(f"Charging Point {charging_point} no registrado, registe la asociación.")
 
 def anadir_asoc(cp: str, ciudad: str):
-    with threading.Lock():
+    with data_lock:
         ciudades_cp[cp] = ciudad
 
 def cargar_ciudades_de_txt():
