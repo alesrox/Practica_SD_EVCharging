@@ -5,11 +5,13 @@ import time
 import argparse
 import threading
 
-import db
+from db import EVCentralAPI
 from charging_point import EV_CP, EstadoCP
 from ev_central_gui import EV_Central_UI
 from kafka_handler import Kafka_Handler
 from socket_handler import Socket_Handler
+
+DB_URL = "http://localhost:9000"
 
 class EV_Central:
     def __init__(
@@ -17,7 +19,7 @@ class EV_Central:
         broker: str = "localhost:9092", 
         port: int = 6000
     ):
-        self.db = db.DataBase()
+        self.db = EVCentralAPI(DB_URL)
         self.db.reset_all_charging_points()
         self.last_msg: Dict[str, float] = {}
         self.ui_callback = ui_callback
@@ -48,9 +50,9 @@ class EV_Central:
     def registrar_punto(self, id: str, msg: dict):
         punto = EV_CP(id, msg["location"], msg["price"], EstadoCP.DESCONECTADO)
 
-        self.db.save_charging_points(punto)
+        self.db.save_charging_point(punto.as_dict())
         gestor.last_msg[id] = time.time()
-        self.db.update_estado(punto, EstadoCP.ACTIVADO)
+        self.db.update_estado(punto.id, EstadoCP.ACTIVADO.value)
         
         self._notificar_ui()
 
@@ -78,7 +80,7 @@ class EV_Central:
             cp.time = None
             self.db.start_time(id, None)
 
-        self.db.update_estado(cp, nuevo_estado)
+        self.db.update_estado(cp.id, nuevo_estado.value)
         gestor.last_msg[id] = time.time()
         self._notificar_ui()
 
