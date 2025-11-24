@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from typing import Dict, Optional
+import threading
 
 # Framework del servidor
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -22,13 +23,15 @@ def cambiar_ciudad():
     nueva_ciudad = input("Introduce la nueva ciudad para el Charging Point: ")
 
     if charging_point in ciudades_cp:
-        ciudades_cp[charging_point] = nueva_ciudad
+        with threading.Lock():
+            ciudades_cp[charging_point] = nueva_ciudad
         print(f"Ciudad del Charging Point {charging_point} actualizada a {nueva_ciudad}.")
     else:
         print(f"Charging Point {charging_point} no registrado, registe la asociación.")
 
 def anadir_asoc(cp: str, ciudad: str):
-    ciudades_cp[cp] = ciudad
+    with threading.Lock():
+        ciudades_cp[cp] = ciudad
 
 def cargar_ciudades_de_txt():
     try:
