@@ -66,6 +66,7 @@ def listar_asociaciones():
             print(f"{cp} -> {ciudad}")
 
 def get_env():
+    env_vars = {}
     try:
         load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
         env_vars = {
@@ -75,10 +76,23 @@ def get_env():
         if not all(env_vars.values()):
             print("Faltan variables de entorno necesarias.")
             exit(1)
-        return env_vars
     except Exception as e:
         print(f"Error loading environment variables: {e}")
         exit(1)
+
+    # Ahora la ip de central
+    try:
+        load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
+        env_vars.update( {
+            'CENTRAL_IP': os.getenv('HOST_IP'),
+        })
+        if not env_vars['CENTRAL_IP']:
+            print("Falta la variable de entorno CENTAL_IP.")
+            exit(1)
+    except Exception as e:
+        print(f"Error loading central environment variables: {e}")
+        exit(1)
+    return env_vars
 
 #############################################################################
 
@@ -116,7 +130,6 @@ if __name__ == "__main__":
 
     variables_entorno = get_env()
     cargar_ciudades_de_txt() # carga ciudades desde el txt, sino existe, no hace nada
-
 
     continua : bool = True
     while continua:
