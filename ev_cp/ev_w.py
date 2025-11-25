@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+
 import asyncio
 import logging
 from datetime import datetime, timedelta
@@ -63,6 +65,24 @@ def listar_asociaciones():
         for cp, ciudad in ciudades_cp.items():
             print(f"{cp} -> {ciudad}")
 
+def get_env():
+    try:
+        load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
+        env_vars = {
+            'WHEATHER_API_KEY': os.getenv('WHEATHER_API_KEY'),
+            'WHEATHER_API_URL': os.getenv('WHEATHER_API_URL')
+        }
+        if not all(env_vars.values()):
+            print("Faltan variables de entorno necesarias.")
+            exit(1)
+        return env_vars
+    except Exception as e:
+        print(f"Error loading environment variables: {e}")
+        exit(1)
+
+#############################################################################
+
+
 def menu():
     print("\n--- Menú de Control de Ciudades de Charging Points ---")
     print("1. Cambiar ciudad de un Charging Point")
@@ -72,28 +92,31 @@ def menu():
 
     opcion = input("Selecciona una opción: ")
 
-    if opcion == "1":
-        cambiar_ciudad()
-    elif opcion == "2":
-        cp = input("Introduce el ID del nuevo Charging Point: ")
-        ciudad = input("Introduce la ciudad asociada: ")
-        check : bool = anadir_asoc(cp, ciudad)
-        if check:
-            print(f"Asociación añadida: {cp} -> {ciudad}")
-        else:
-            print(f"La asociación para el Charging Point {cp} ya está registrada.")
-    elif opcion == "3":
-        listar_asociaciones()
-    elif opcion == "4":
-        return False
-    else:
-        print("Opción no válida. Por favor, intenta de nuevo.")
+    match opcion:
+        case "1":
+            cambiar_ciudad()
+        case "2":
+            cp = input("Introduce el ID del nuevo Charging Point: ")
+            ciudad = input("Introduce la ciudad asociada: ")
+            check : bool = anadir_asoc(cp, ciudad)
+            if check:
+                print(f"Asociación añadida: {cp} -> {ciudad}")
+            else:
+                print(f"La asociación para el Charging Point {cp} ya está registrada.")
+        case "3":
+            listar_asociaciones()
+        case "4":
+            return False
+        case _:
+            print("Opción no válida. Por favor, intenta de nuevo.")
 
     return True
 
 if __name__ == "__main__":
 
+    variables_entorno = get_env()
     cargar_ciudades_de_txt() # carga ciudades desde el txt, sino existe, no hace nada
+
 
     continua : bool = True
     while continua:
