@@ -1,3 +1,4 @@
+import os
 import asyncio
 import logging
 from datetime import datetime, timedelta
@@ -21,7 +22,7 @@ data_lock = threading.Lock()
 ciudades_cp: Dict[str, str] = {}
 
 def cambiar_ciudad():
-    print("-- Menú de control de ciudades de Charging Points --")
+    print("\n-- Menú de cambio de ciudades de Charging Points --")
 
     charging_point = input("Introduce el ID del Charging Point que deseas modificar: ")
     nueva_ciudad = input("Introduce la nueva ciudad para el Charging Point: ")
@@ -29,29 +30,45 @@ def cambiar_ciudad():
     if charging_point in ciudades_cp:
         with data_lock:
             ciudades_cp[charging_point] = nueva_ciudad
-        print(f"Ciudad del Charging Point {charging_point} actualizada a {nueva_ciudad}.")
+        print(f"\nCiudad del Charging Point {charging_point} actualizada a {nueva_ciudad}.")
     else:
         print(f"Charging Point {charging_point} no registrado, registe la asociación.")
 
 def anadir_asoc(cp: str, ciudad: str):
+    if cp in ciudades_cp:
+        return False
+    
     with data_lock:
         ciudades_cp[cp] = ciudad
+    return True
 
 def cargar_ciudades_de_txt():
     try:
-        with open("../ciudades_cp.txt", "r") as archivo:
+        carpeta_actual = os.path.dirname(__file__)
+        ruta_txt = os.path.join(carpeta_actual, "..", "ciudades_cp.txt")
+        
+        # Abre el archivo usando la ruta absoluta calculada
+        with open(ruta_txt, "r") as archivo:
             for linea in archivo:
                 cp, ciudad = linea.strip().split(" = ")
-                anadir_asoc(cp, ciudad)
-        print("Ciudades de Charging Points cargadas correctamente.")
+                anadir_asoc(cp.strip(), ciudad.strip())
+        print(f"Ciudades cargadas correctamente")
+
     except FileNotFoundError:
-        pass
+        print(f"Error: No se encuentra el archivo.")
+
+def listar_asociaciones():
+    print("\nAsociaciones actuales de Charging Points y ciudades:")
+    with data_lock:
+        for cp, ciudad in ciudades_cp.items():
+            print(f"{cp} -> {ciudad}")
 
 def menu():
     print("\n--- Menú de Control de Ciudades de Charging Points ---")
     print("1. Cambiar ciudad de un Charging Point")
     print("2. Añadir nueva asociación de Charging Point y ciudad")
-    print("3. Salir")
+    print("3. Listar asociaciones actuales")
+    print("4. Salir")
 
     opcion = input("Selecciona una opción: ")
 
@@ -60,9 +77,14 @@ def menu():
     elif opcion == "2":
         cp = input("Introduce el ID del nuevo Charging Point: ")
         ciudad = input("Introduce la ciudad asociada: ")
-        anadir_asoc(cp, ciudad)
-        print(f"Asociación añadida: {cp} -> {ciudad}")
+        check : bool = anadir_asoc(cp, ciudad)
+        if check:
+            print(f"Asociación añadida: {cp} -> {ciudad}")
+        else:
+            print(f"La asociación para el Charging Point {cp} ya está registrada.")
     elif opcion == "3":
+        listar_asociaciones()
+    elif opcion == "4":
         return False
     else:
         print("Opción no válida. Por favor, intenta de nuevo.")
