@@ -15,8 +15,7 @@ class ChargingPointModel(BaseModel):
     driver: Optional[str] = None
     kwh: Optional[float] = 0
     time: Optional[float] = None
-    auth_key: Optional[str] = None
-    session_key: Optional[str] = None
+    token: Optional[str] = None
 
 class EstadoModel(BaseModel):
     cp_id: str

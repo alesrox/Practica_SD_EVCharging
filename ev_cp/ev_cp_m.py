@@ -74,7 +74,6 @@ class Monitor:
                             return response["status"]
                     except Exception:
                         continue
-
         except (ConnectionRefusedError, socket.timeout):
             pass
 
@@ -114,6 +113,12 @@ class Monitor:
             print(json.dumps(res.json(), indent=2)) 
             print("-" * 30)
             raise e
+
+        # mensaje = {"type": "keys", "id": self.id, "auth_key": self.auth_key, "session_key": self.session_key}
+        # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        #     s.settimeout(2)
+        #     s.connect((self.engine_host, self.engine_port))
+        #     s.send(json.dumps(mensaje).encode("utf-8"))
 
     def update_status(self, intervalo: int = 1):
         while True:

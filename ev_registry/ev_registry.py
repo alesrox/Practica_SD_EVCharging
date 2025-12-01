@@ -24,10 +24,7 @@ class CPRegistration(BaseModel):
     price: float
 
 def generate_keys_for_cp():
-    return {
-        "auth_key": secrets.token_hex(32),
-        "session_key": secrets.token_hex(32)
-    }
+    return secrets.token_hex(32)
 
 # -----------------------------
 # Endpoints
@@ -38,7 +35,7 @@ def alta_cp(data: CPRegistration):
     location = data.location
     price = data.price
 
-    keys = generate_keys_for_cp()
+    token = generate_keys_for_cp()
 
     payload = {
         "id": cp_id,
@@ -48,8 +45,7 @@ def alta_cp(data: CPRegistration):
         "driver": None,
         "kwh": 0,
         "time": None,
-        "auth_key": keys["auth_key"],
-        "session_key": keys["session_key"]
+        "token": token
     }
 
     try:
@@ -66,7 +62,7 @@ def alta_cp(data: CPRegistration):
 
     return JSONResponse({
         "status": "CP registrado correctamente",
-        "keys_for_EV_Central": keys
+        "token": token
     })
 
 

@@ -23,8 +23,7 @@ class DataBase:
                 driver TEXT,
                 kwh REAL,
                 time REAL,
-                auth_key TEXT,
-                session_key TEXT,
+                token TEXT,
                 FOREIGN KEY (driver) REFERENCES drivers(id)
             )
         """)
@@ -69,8 +68,8 @@ class DataBase:
         cursor = conn.cursor()
         cursor.execute("""
             INSERT OR REPLACE INTO puntos_carga
-            (id, location, price, estado, driver, kwh, time, auth_key, session_key)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, location, price, estado, driver, kwh, time, token)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             cp["id"],
             cp["location"],
@@ -79,8 +78,7 @@ class DataBase:
             cp.get("driver"),
             cp.get("kwh", 0),
             cp.get("time"),
-            cp.get("auth_key"),
-            cp.get("session_key"),
+            cp.get("token"),
         ))
         conn.commit()
         conn.close()
@@ -89,7 +87,7 @@ class DataBase:
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, location, price, estado, driver, kwh, time, auth_key, session_key
+            SELECT id, location, price, estado, driver, kwh, time, token
             FROM puntos_carga
             WHERE id = ?
         """, (cp_id,))
@@ -107,15 +105,14 @@ class DataBase:
             "driver": row[4],
             "kwh": row[5] if row[5] is not None else 0,
             "time": row[6],
-            "auth_key": row[7],
-            "session_key": row[8]
+            "token": row[7]
         }
 
     def load_charging_points(self) -> Dict[str, Dict]:
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, location, price, estado, driver, kwh, time, auth_key, session_key 
+            SELECT id, location, price, estado, driver, kwh, time, token 
             FROM puntos_carga
         """)
         rows = cursor.fetchall()
@@ -131,8 +128,7 @@ class DataBase:
                 "driver": row[4],
                 "kwh": row[5] if row[5] is not None else 0,
                 "time": row[6],
-                "auth_key": row[7],
-                "session_key": row[8]
+                "token": row[7]
             }
         return puntos
 
