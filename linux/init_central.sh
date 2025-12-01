@@ -9,6 +9,7 @@ pip3.11 install -r requirements.txt
 
 # Ejecutar topics.py
 python3.11 topics.py
+clear
 
 run_in_new_terminal() {
     CMD=$1
