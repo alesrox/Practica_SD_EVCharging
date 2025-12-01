@@ -64,18 +64,18 @@ class EV_Central_UI:
         self.clear_messages()
         self.clear_on_going_messages()
         for i, punto in enumerate(charging_points.values()):
-            bg_color = colores[punto.estado.name]
+            bg_color = colores[punto['estado']]
             self._update_or_create_point_frame(i, punto, bg_color)
-            if punto.estado.name == "PARADO":
-                self.add_message(f"[{punto.id}] Out of order")
-            elif punto.estado.name == "SUMINISTRANDO":
-                date_formated = datetime.fromtimestamp(punto.time)
+            if punto['estado'] == "PARADO":
+                self.add_message(f"[{punto['id']}] Out of order")
+            elif punto['estado'] == "SUMINISTRANDO":
+                date_formated = datetime.fromtimestamp(punto['time'])
                 date_formated = date_formated.strftime("%d/%m/%Y | %H:%M:%S")
-                self.add_on_going_message(f"{date_formated} | {punto.id} | {punto.driver or 'N/A'}")
+                self.add_on_going_message(f"{date_formated} | {punto['id']} | {punto['driver'] or 'N/A'}")
         self.root.update_idletasks()
 
     def _update_or_create_point_frame(self, index, punto, bg_color):
-        if punto.id not in self.frames:
+        if punto['id'] not in self.frames:
             self._create_point_frame(index, punto, bg_color)
         else:
             self._update_point_frame(punto, bg_color)
@@ -94,18 +94,18 @@ class EV_Central_UI:
         frame.pack_propagate(False)
 
         # Frame clickeable
-        frame.bind("<Button-1>", lambda e, pid=punto.id: self.on_click(pid))
+        frame.bind("<Button-1>", lambda e, pid=punto['id']: self.on_click(pid))
 
-        label_status = tk.Label(frame, text=punto.estado.name, font=("Arial", 9, "italic"), fg="white", bg=bg_color)
+        label_status = tk.Label(frame, text=punto['estado'], font=("Arial", 9, "italic"), fg="white", bg=bg_color)
         label_status.pack(pady=(3, 3))
 
-        label_id = tk.Label(frame, text=f"ID: {punto.id}", font=("Arial", 10, "bold"), fg="white", bg=bg_color)
+        label_id = tk.Label(frame, text=f"ID: {punto['id']}", font=("Arial", 10, "bold"), fg="white", bg=bg_color)
         label_id.pack(pady=(2, 2))
         
-        label_location = tk.Label(frame, text=punto.location, font=("Arial", 10), fg="white", bg=bg_color)
+        label_location = tk.Label(frame, text=punto['location'], font=("Arial", 10), fg="white", bg=bg_color)
         label_location.pack(pady=(2, 2))
 
-        label_price = tk.Label(frame, text=f"{punto.price}€/kWh", font=("Arial", 10), fg="white", bg=bg_color)
+        label_price = tk.Label(frame, text=f"{punto['price']}€/kWh", font=("Arial", 10), fg="white", bg=bg_color)
         label_price.pack(pady=(2, 2))
 
         label_driver = tk.Label(frame, font=("Arial", 10), fg="white", bg=bg_color)
@@ -116,7 +116,7 @@ class EV_Central_UI:
         label_kwh.pack(pady=(0, 0))
         label_ticket.pack(pady=(0, 0))
 
-        self.frames[punto.id] = {
+        self.frames[punto['id']] = {
             "frame": frame,
             "id": label_id,
             "status": label_status,
@@ -129,38 +129,38 @@ class EV_Central_UI:
         self.gestor.parar_cp(punto_id)
 
     def _update_point_frame(self, punto, bg_color):
-        frame_data = self.frames[punto.id]
+        frame_data = self.frames[punto['id']]
 
         frame, label_id, label_status, label_location, label_price = (
-            frame_data["frame"],
-            frame_data["id"],
-            frame_data["status"],
-            frame_data["location"],
-            frame_data["price"]
+            frame_data['frame'],
+            frame_data['id'],
+            frame_data['status'],
+            frame_data['location'],
+            frame_data['price']
         )
 
         frame.config(bg=bg_color)
-        label_id.config(bg=bg_color, text=f"ID: {punto.id}")
-        label_status.config(bg=bg_color, text=punto.estado.name)
-        label_location.config(bg=bg_color, text=punto.location)
-        label_price.config(bg=bg_color, text=f"{punto.price}€/kWh")
+        label_id.config(bg=bg_color, text=f"ID: {punto['id']}")
+        label_status.config(bg=bg_color, text=punto['estado'])
+        label_location.config(bg=bg_color, text=punto['location'])
+        label_price.config(bg=bg_color, text=f"{punto['price']}€/kWh")
         
-        for lbl in frame_data["extras"]:
+        for lbl in frame_data['extras']:
             lbl.config(bg=bg_color)
 
-        if punto.estado == EstadoCP.SUMINISTRANDO:
+        if punto['estado'] == EstadoCP.SUMINISTRANDO:
             self._update_supply_info(punto)
         else:
-            self._clear_extras(punto.id)
+            self._clear_extras(punto['id'])
 
     def _update_supply_info(self, punto):
-        label_driver, label_kwh, label_ticket = self.frames[punto.id]["extras"]
-        label_driver.config(text=f"Driver: {punto.driver or 'N/A'}")
-        label_kwh.config(text=f"Consumo: {punto.kwh} kWh")
-        label_ticket.config(text=f"Importe: {punto.ticket} €")
+        label_driver, label_kwh, label_ticket = self.frames[punto['id']]['extras']
+        label_driver.config(text=f"Driver: {punto['driver'] or 'N/A'}")
+        label_kwh.config(text=f"Consumo: {punto['kwh']} kWh")
+        label_ticket.config(text=f"Importe: {punto['ticket']} €")
 
     def _clear_extras(self, punto_id):
-        for lbl in self.frames[punto_id]["extras"]:
+        for lbl in self.frames[punto_id]['extras']:
             lbl.config(text="")
 
     # ------------------- MENSAJES DE INFORMACIÓN -------------------

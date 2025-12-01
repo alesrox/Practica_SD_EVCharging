@@ -1,4 +1,5 @@
 confluent-kafka==2.6.0
 fastapi
-uvicorn[standard]
-httpx 
+uvicorn[standard]==0.23.2
+requests
+httpx

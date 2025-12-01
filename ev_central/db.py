@@ -1,197 +1,63 @@
-import sqlite3
-from typing import Dict
-from datetime import datetime
-from charging_point import EV_CP, EstadoCP
+import requests
+from typing import Dict, Any, Optional
 
-DB_PATH = "EV_DATABASE.db"
+class EVCentralAPI:
+    def __init__(self, server_url: str = "http://localhost:9000"):
+        self.server_url = server_url.rstrip("/")
 
-class DataBase:
-    def __init__(self, db_name=DB_PATH):
-        self.db_name = db_name
-        self.crear_tabla()
+    # --- Charging points ---
+    def load_charging_points(self) -> Dict[str, Any]:
+        resp = requests.get(f"{self.server_url}/charging_points")
+        resp.raise_for_status()
+        return resp.json()
 
-    def crear_tabla(self):
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS puntos_carga (
-                id TEXT PRIMARY KEY,
-                location TEXT NOT NULL,
-                price REAL NOT NULL,
-                estado TEXT NOT NULL DEFAULT 'DESCONECTADO'
-                    CHECK (estado IN ('ACTIVADO', 'PARADO', 'SUMINISTRANDO', 'AVERIADO', 'DESCONECTADO')),
-                driver TEXT,
-                kwh REAL,
-                time REAL,
-                FOREIGN KEY (driver) REFERENCES drivers(id)
-            )
-        """)
+    def get_charging_point(self, cp_id: str) -> Optional[Dict[str, Any]]:
+        resp = requests.get(f"{self.server_url}/charging_point/{cp_id}")
+        if resp.status_code == 404:
+            resp.raise_for_status()
+        resp.raise_for_status()
+        return resp.json()
 
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS tickets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                driver_id TEXT,
-                fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                punto_carga TEXT NOT NULL,
-                total FLOAT NOT NULL,
-                FOREIGN KEY (punto_carga) REFERENCES puntos_carga(id)
-            )
-        """)
+    def save_charging_point(self, cp: Dict[str, Any]):
+        resp = requests.post(f"{self.server_url}/charging_point/save", json=cp)
+        resp.raise_for_status()
 
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS drivers (
-                id TEXT PRIMARY KEY,
-                location TEXT NOT NULL
-            )
-        """)
+    def update_estado(self, cp_id: str, estado: str):
+        resp = requests.post(f"{self.server_url}/charging_point/estado", json={"cp_id": cp_id, "estado": estado})
+        resp.raise_for_status()
 
-        conn.commit()
-        conn.close()
-
-    def reset_all_charging_points(self):
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE puntos_carga
-            SET estado = 'DESCONECTADO',
-                driver = NULL,
-                kwh = 0,
-                time = NULL
-        """)
-        conn.commit()
-        conn.close()
-
-    def save_charging_points(self, punto: EV_CP):
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT OR REPLACE INTO puntos_carga
-            (id, location, price, estado, driver, kwh, time)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            punto.id, punto.location, punto.price,
-            punto.estado.value, punto.driver,
-            punto.kwh, punto.time
-        ))
-        conn.commit()
-        conn.close()
-
-    def get_charging_point(self, cp_id) -> EV_CP | None:
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, location, price, estado, driver, kwh, time
-            FROM puntos_carga
-            WHERE id = ?
-        """, (cp_id,))
-        row = cursor.fetchone()
-        conn.close()
-        if row is None:
-            return None
-        estado_enum = EstadoCP(row[3])
-        cp = EV_CP(
-            id=row[0],
-            location=row[1],
-            price=row[2],
-            estado=estado_enum,
-            driver=row[4],
-            kwh=row[5] if row[5] is not None else 0,
-            ticket=0
-        )
-        cp.time = row[6]
-        return cp
-
-    def load_charging_points(self) -> Dict[str, EV_CP]:
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, location, price, estado, driver, kwh, time FROM puntos_carga")
-        rows = cursor.fetchall()
-        conn.close()
-        puntos = {}
-        for row in rows:
-            cp = EV_CP(
-                id=row[0],
-                location=row[1],
-                price=row[2],
-                estado=EstadoCP(row[3]),
-                driver=row[4],
-                kwh=row[5] if row[5] is not None else 0
-            )
-            cp.time = row[6]
-            puntos[row[0]] = cp
-        return puntos
-
-    def save_driver(self, driver_id, location):
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT OR IGNORE INTO drivers (id, location) VALUES (?, ?)",
-            (driver_id, location)
-        )
-        conn.commit()
-        conn.close()
-
-    def load_drivers(self) -> Dict[str, str]:
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, location FROM drivers")
-        rows = cursor.fetchall()
-        conn.close()
-        drivers = {row[0]: row[1] for row in rows}
-        return drivers
-
-    def update_estado(self, cp: EV_CP | str, nuevo_estado: EstadoCP):
-        cp_id = cp.id if isinstance(cp, EV_CP) else cp
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute("UPDATE puntos_carga SET estado = ? WHERE id = ?", (nuevo_estado.value, cp_id))
-        conn.commit()
-        conn.close()
-        if isinstance(cp, EV_CP):
-            cp.estado = nuevo_estado
-
-    def set_driver(self, cp_id: str, driver: str | None):
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute("UPDATE puntos_carga SET driver = ? WHERE id = ?", (driver, cp_id))
-        conn.commit()
-        conn.close()
+    def set_driver(self, cp_id: str, driver: Optional[str]):
+        resp = requests.post(f"{self.server_url}/charging_point/set_driver", json={"cp_id": cp_id, "driver": driver})
+        resp.raise_for_status()
 
     def update_kwh(self, cp_id: str, kwh: float):
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute("UPDATE puntos_carga SET kwh = ? WHERE id = ?", (kwh, cp_id))
-        conn.commit()
-        conn.close()
+        resp = requests.post(f"{self.server_url}/charging_point/kwh", json={"cp_id": cp_id, "kwh": kwh})
+        resp.raise_for_status()
 
-    def start_time(self, cp_id: str, timestamp: float | None):
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute("UPDATE puntos_carga SET time = ? WHERE id = ?", (timestamp, cp_id))
-        conn.commit()
-        conn.close()
+    def start_time(self, cp_id: str, timestamp: Optional[float]):
+        resp = requests.post(f"{self.server_url}/charging_point/start_time", json={"cp_id": cp_id, "time": timestamp})
+        resp.raise_for_status()
 
-    def guardar_ticket(self, driver, cp_id, total_ticket):
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute("""
-            INSERT INTO tickets (driver_id, punto_carga, total, fecha)
-            VALUES (?, ?, ?, ?)
-        """, (driver, cp_id, total_ticket, fecha))
-        conn.commit()
-        print(f"[DB] Ticket guardado (Driver: {driver or 'N/A'}, CP: {cp_id}, Total: {total_ticket}€)")
-        conn.close()
+    def reset_all_charging_points(self):
+        resp = requests.post(f"{self.server_url}/charging_points/reset")
+        resp.raise_for_status()
 
-    def get_tickets_by_driver(self, driver_id: str):
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT fecha, punto_carga, total
-            FROM tickets
-            WHERE driver_id = ?
-            ORDER BY fecha DESC
-        """, (driver_id,))
-        tickets = cursor.fetchall()
-        conn.close()
-        return tickets
+    # --- Drivers ---
+    def save_driver(self, driver_id: str, location: str):
+        resp = requests.post(f"{self.server_url}/driver/save", json={"id": driver_id, "location": location})
+        resp.raise_for_status()
+
+    def load_drivers(self) -> Dict[str, str]:
+        resp = requests.get(f"{self.server_url}/drivers")
+        resp.raise_for_status()
+        return resp.json()
+
+    # --- Tickets ---
+    def guardar_ticket(self, driver: str, cp_id: str, total: float):
+        resp = requests.post(f"{self.server_url}/ticket/save", json={"driver": driver, "cp_id": cp_id, "total": total})
+        resp.raise_for_status()
+
+    def get_tickets_by_driver(self, driver: str):
+        resp = requests.get(f"{self.server_url}/tickets/{driver}")
+        resp.raise_for_status()
+        return resp.json()
