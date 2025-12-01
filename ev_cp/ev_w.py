@@ -23,6 +23,51 @@ data_lock = threading.Lock()
 # Diccionario para almacenar las asociaciones de Charging Points y ciudades
 ciudades_cp: Dict[str, str] = {}
 
+# Caché para almacenar datos meteorológicos y evitar llamadas repetidas
+weather_cache: Dict[str, str] = {}
+
+async def obtener_grados(ciudad: str, api_key: str, api_url: str) -> Optional[float]:
+    params = {
+        "q": ciudad,
+        "appid": api_key,
+        "units": "metric"
+    }
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(api_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            return data["main"]["temp"]
+        except httpx.HTTPError as e:
+            logging.error(f"Error al obtener datos meteorológicos para {ciudad}: {e}")
+            return None
+        
+async def bucle_clima(env_vars: Dict[str, str]):
+    api_key = env_vars['WEATHER_API_KEY']
+    api_url = env_vars['WEATHER_API_URL']
+
+    print("\n-- Iniciando bucle de actualización meteorológica --")
+
+    ciudades = []
+    
+    while True:
+        with data_lock:
+            ciudades = list(set(ciudades_cp.values())) 
+        
+        tareas = [obtener_grados(ciudad, api_key, api_url) for ciudad in ciudades]
+
+        # Ejecuta todas las tareas a la vez
+        resultados = await asyncio.gather(*tareas) # Espera a que todas las tareas se completen
+
+        # Actualiza la caché con los nuevos datos
+        with data_lock:
+            for ciudad, grados in zip(ciudades, resultados):
+                if grados is not None:
+                    weather_cache[ciudad] = grados
+
+        await asyncio.sleep(4)  # Espera 4 segundos antes de la siguiente actualización
+
+
 def cambiar_ciudad():
     print("\n-- Menú de cambio de ciudades de Charging Points --")
 
@@ -70,8 +115,8 @@ def get_env():
     try:
         load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
         env_vars = {
-            'WHEATHER_API_KEY': os.getenv('WHEATHER_API_KEY'),
-            'WHEATHER_API_URL': os.getenv('WHEATHER_API_URL')
+            'WEATHER_API_KEY': os.getenv('WEATHER_API_KEY'),
+            'WEATHER_API_URL': os.getenv('WEATHER_API_URL')
         }
         if not all(env_vars.values()):
             print("Faltan variables de entorno necesarias.")
@@ -130,6 +175,11 @@ if __name__ == "__main__":
 
     variables_entorno = get_env()
     cargar_ciudades_de_txt() # carga ciudades desde el txt, sino existe, no hace nada
+
+    # Inicia el bucle de actualización meteorológica en segundo plano
+    def iniciar_bucle_clima():
+        asyncio.run(bucle_clima(variables_entorno))
+    threading.Thread(target=iniciar_bucle_clima, daemon=True).start()
 
     continua : bool = True
     while continua:
