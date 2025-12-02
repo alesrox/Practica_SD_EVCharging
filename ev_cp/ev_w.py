@@ -1,186 +1,214 @@
 import os
+import tkinter as tk
+from tkinter import ttk, messagebox, scrolledtext
 from dotenv import load_dotenv
 
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from contextlib import asynccontextmanager
 from typing import Dict, Optional
 import threading
 
 # Framework del servidor
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-
-# Validación de datos (Esencial en FastAPI)
 from pydantic import BaseModel
-
-# Cliente HTTP Asíncrono (El sustituto de requests para FastAPI)
 import httpx
 
 # Bloqueo para acceso seguro a datos compartidos
 data_lock = threading.Lock()
 
-# Diccionario para almacenar las asociaciones de Charging Points y ciudades
+# Datos compartidos
 ciudades_cp: Dict[str, str] = {}
+weather_cache: Dict[str, dict] = {} # Ajustado type hint
+CACHE_DURATION = timedelta(minutes=1)
 
-# Caché para almacenar datos meteorológicos y evitar llamadas repetidas
-weather_cache: Dict[str, str] = {}
+# --- Backend Asíncrono ---
 
 async def obtener_grados(ciudad: str, api_key: str, api_url: str) -> Optional[float]:
-    params = {
-        "q": ciudad,
-        "appid": api_key,
-        "units": "metric"
-    }
+    now = datetime.now()
+    
+    # Check Caché
+    if ciudad in weather_cache:
+        d = weather_cache[ciudad]
+        if now - d['time'] < CACHE_DURATION:
+            return d['temp']
+
+    params = {"q": ciudad, "appid": api_key, "units": "metric"}
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(api_url, params=params)
             response.raise_for_status()
             data = response.json()
-            return data["main"]["temp"]
-        except httpx.HTTPError as e:
-            logging.error(f"Error al obtener datos meteorológicos para {ciudad}: {e}")
+            t = data["main"]["temp"]
+            # Guardamos temp y hora
+            weather_cache[ciudad] = {"temp": t, "time": now} 
+            return t
+        except Exception:
             return None
-        
-async def bucle_clima(env_vars: Dict[str, str]):
+
+async def notificar_central(ciudad: str, temp: float, central_ip: str, gui_app=None):
+    pass
+
+async def bucle_clima(env_vars: Dict[str, str], gui_app):
+    """
+    Recibe gui_app para pasárselo a las notificaciones
+    """
     api_key = env_vars['WEATHER_API_KEY']
     api_url = env_vars['WEATHER_API_URL']
+    central_ip = env_vars['CENTRAL_IP']
 
-    print("\n-- Iniciando bucle de actualización meteorológica --")
+    # Mensaje inicial en la ventana
+    gui_app.agregar_log("Motor de clima iniciado en segundo plano...", "sistema")
 
-    ciudades = []
-    
     while True:
+        ciudades = []
         with data_lock:
             ciudades = list(set(ciudades_cp.values())) 
         
-        tareas = [obtener_grados(ciudad, api_key, api_url) for ciudad in ciudades]
+        if ciudades:
+            tareas = [obtener_grados(ciudad, api_key, api_url) for ciudad in ciudades]
+            resultados = await asyncio.gather(*tareas)
 
-        # Ejecuta todas las tareas a la vez
-        resultados = await asyncio.gather(*tareas) # Espera a que todas las tareas se completen
+            tareas_notif = []
+            with data_lock:
+                for ciudad, grados in zip(ciudades, resultados):
+                    if grados is not None:
+                        # Pasamos gui_app aquí
+                        tareas_notif.append(notificar_central(ciudad, grados, central_ip, gui_app))
+            
+            if tareas_notif:
+                await asyncio.gather(*tareas_notif)
 
-        # Actualiza la caché con los nuevos datos
-        with data_lock:
-            for ciudad, grados in zip(ciudades, resultados):
-                if grados is not None:
-                    weather_cache[ciudad] = grados
+        await asyncio.sleep(4)
 
-        await asyncio.sleep(4)  # Espera 4 segundos antes de la siguiente actualización
-
-
-def cambiar_ciudad():
-    print("\n-- Menú de cambio de ciudades de Charging Points --")
-
-    charging_point = input("Introduce el ID del Charging Point que deseas modificar: ")
-    nueva_ciudad = input("Introduce la nueva ciudad para el Charging Point: ")
-
-    if charging_point in ciudades_cp:
-        with data_lock:
-            ciudades_cp[charging_point] = nueva_ciudad
-        print(f"\nCiudad del Charging Point {charging_point} actualizada a {nueva_ciudad}.")
-    else:
-        print(f"Charging Point {charging_point} no registrado, registe la asociación.")
-
-def anadir_asoc(cp: str, ciudad: str):
-    if cp in ciudades_cp:
-        return False
-    
-    with data_lock:
-        ciudades_cp[cp] = ciudad
-    return True
+# --- GESTIÓN DE ARCHIVOS ---
 
 def cargar_ciudades_de_txt():
     try:
         carpeta_actual = os.path.dirname(__file__)
         ruta_txt = os.path.join(carpeta_actual, "..", "ciudades_cp.txt")
-        
-        # Abre el archivo usando la ruta absoluta calculada
         with open(ruta_txt, "r") as archivo:
             for linea in archivo:
-                cp, ciudad = linea.strip().split(" = ")
-                anadir_asoc(cp.strip(), ciudad.strip())
-        print(f"Ciudades cargadas correctamente")
-
+                if "=" in linea:
+                    cp, ciudad = linea.strip().split("=")
+                    with data_lock:
+                        ciudades_cp[cp.strip()] = ciudad.strip()
     except FileNotFoundError:
-        print(f"Error: No se encuentra el archivo.")
-
-def listar_asociaciones():
-    print("\nAsociaciones actuales de Charging Points y ciudades:")
-    with data_lock:
-        for cp, ciudad in ciudades_cp.items():
-            print(f"{cp} -> {ciudad}")
+        pass
 
 def get_env():
     env_vars = {}
     try:
         load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
-        env_vars = {
-            'WEATHER_API_KEY': os.getenv('WEATHER_API_KEY'),
-            'WEATHER_API_URL': os.getenv('WEATHER_API_URL')
-        }
-        if not all(env_vars.values()):
-            print("Faltan variables de entorno necesarias.")
-            exit(1)
-    except Exception as e:
-        print(f"Error loading environment variables: {e}")
-        exit(1)
-
-    # Ahora la ip de central
-    try:
+        env_vars = {'WEATHER_API_KEY': os.getenv('WEATHER_API_KEY'), 'WEATHER_API_URL': os.getenv('WEATHER_API_URL')}
         load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
-        env_vars.update( {
-            'CENTRAL_IP': os.getenv('HOST_IP'),
-        })
-        if not env_vars['CENTRAL_IP']:
-            print("Falta la variable de entorno CENTAL_IP.")
-            exit(1)
-    except Exception as e:
-        print(f"Error loading central environment variables: {e}")
+        env_vars['CENTRAL_IP'] = os.getenv('HOST_IP')
+        return env_vars
+    except Exception:
         exit(1)
-    return env_vars
 
-#############################################################################
+# --- INTERFAZ GRÁFICA ---
 
+class WeatherAppGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Weather Control Office (EV_W)")
+        self.root.geometry("700x550")
 
-def menu():
-    print("\n--- Menú de Control de Ciudades de Charging Points ---")
-    print("1. Cambiar ciudad de un Charging Point")
-    print("2. Añadir nueva asociación de Charging Point y ciudad")
-    print("3. Listar asociaciones actuales")
-    print("4. Salir")
+        # 1. Panel de Gestión (Arriba)
+        frame_input = tk.LabelFrame(self.root, text="Gestión Manual", padx=10, pady=10)
+        frame_input.pack(fill="x", padx=10, pady=5)
 
-    opcion = input("Selecciona una opción: ")
+        tk.Label(frame_input, text="ID CP:").grid(row=0, column=0, padx=5)
+        self.entry_cp = tk.Entry(frame_input, width=10)
+        self.entry_cp.grid(row=0, column=1, padx=5)
 
-    match opcion:
-        case "1":
-            cambiar_ciudad()
-        case "2":
-            cp = input("Introduce el ID del nuevo Charging Point: ")
-            ciudad = input("Introduce la ciudad asociada: ")
-            check : bool = anadir_asoc(cp, ciudad)
-            if check:
-                print(f"Asociación añadida: {cp} -> {ciudad}")
-            else:
-                print(f"La asociación para el Charging Point {cp} ya está registrada.")
-        case "3":
-            listar_asociaciones()
-        case "4":
-            return False
-        case _:
-            print("Opción no válida. Por favor, intenta de nuevo.")
+        tk.Label(frame_input, text="Ciudad:").grid(row=0, column=2, padx=5)
+        self.entry_ciudad = tk.Entry(frame_input, width=15)
+        self.entry_ciudad.grid(row=0, column=3, padx=5)
 
-    return True
+        tk.Button(frame_input, text="Guardar", command=self.guardar_asociacion, bg="#4CAF50", fg="white").grid(row=0, column=4, padx=10)
+
+        # 2. Tabla de Estado (Centro)
+        frame_tabla = tk.LabelFrame(self.root, text="Estado Actual", padx=10, pady=10)
+        frame_tabla.pack(fill="both", expand=True, padx=10, pady=5)
+
+        self.tree = ttk.Treeview(frame_tabla, columns=("cp", "ciudad", "temp"), show="headings", height=6)
+        self.tree.heading("cp", text="ID CP")
+        self.tree.heading("ciudad", text="Ciudad")
+        self.tree.heading("temp", text="Temp (ºC)")
+        self.tree.pack(fill="both", expand=True)
+
+        # 3. Consola de Logs (Abajo)
+        frame_log = tk.LabelFrame(self.root, text="Logs de API (Tiempo Real)", padx=10, pady=10)
+        frame_log.pack(fill="both", expand=True, padx=10, pady=5)
+
+        self.console_log = scrolledtext.ScrolledText(frame_log, height=10, state='disabled', bg="black", fg="#00FF00", font=("Consolas", 9))
+        self.console_log.pack(fill="both", expand=True)
+        
+        # Colores para los logs
+        self.console_log.tag_config("alerta", foreground="red")
+        self.console_log.tag_config("info", foreground="#00FF00") # Verde
+        self.console_log.tag_config("error", foreground="yellow")
+        self.console_log.tag_config("sistema", foreground="cyan")
+
+        # Refresco automático
+        self.actualizar_tabla()
+
+    def guardar_asociacion(self):
+        cp = self.entry_cp.get().strip()
+        ciudad = self.entry_ciudad.get().strip()
+        if cp and ciudad:
+            with data_lock:
+                ciudades_cp[cp] = ciudad
+            self.agregar_log(f"✏️ GESTIÓN: Asociado {cp} -> {ciudad}", "sistema")
+            self.entry_cp.delete(0, tk.END)
+            self.entry_ciudad.delete(0, tk.END)
+
+    def agregar_log(self, mensaje, etiqueta):
+        """
+        Esta función es llamada desde el HILO ASÍNCRONO.
+        Usamos root.after para que sea seguro pintar en la ventana.
+        """
+        def _pintar():
+            self.console_log.config(state='normal') # Desbloquear para escribir
+            self.console_log.insert(tk.END, mensaje + "\n", etiqueta)
+            self.console_log.see(tk.END)            # Auto-scroll al final
+            self.console_log.config(state='disabled') # Bloquear para que no borres
+        
+        self.root.after(0, _pintar)
+
+    def actualizar_tabla(self):
+        # Limpiar y repintar tabla
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        
+        with data_lock:
+            mis_datos = ciudades_cp.copy()
+            mi_cache = weather_cache.copy()
+
+        for cp, ciudad in mis_datos.items():
+            dato = mi_cache.get(ciudad)
+            temp_str = f"{dato['temp']}ºC" if dato else "..."
+            self.tree.insert("", tk.END, values=(cp, ciudad, temp_str))
+        
+        self.root.after(1000, self.actualizar_tabla)
+
+# --- MAIN ---
 
 if __name__ == "__main__":
+    variables = get_env()
+    cargar_ciudades_de_txt()
 
-    variables_entorno = get_env()
-    cargar_ciudades_de_txt() # carga ciudades desde el txt, sino existe, no hace nada
+    # Arrancamos la ventana
+    root = tk.Tk()
+    app = WeatherAppGUI(root)
 
-    # Inicia el bucle de actualización meteorológica en segundo plano
-    def iniciar_bucle_clima():
-        asyncio.run(bucle_clima(variables_entorno))
-    threading.Thread(target=iniciar_bucle_clima, daemon=True).start()
+    # Inyectamos la 'app' en el bucle para que pueda escribir logs
+    def iniciar_motor():
+        asyncio.run(bucle_clima(variables, app))
+    
+    hilo = threading.Thread(target=iniciar_motor, daemon=True)
+    hilo.start()
 
-    continua : bool = True
-    while continua:
-        continua = menu()
+    root.mainloop()
