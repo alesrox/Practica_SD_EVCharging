@@ -49,6 +49,7 @@ async def obtener_grados(ciudad: str, api_key: str, api_url: str) -> Optional[fl
 async def notificar_central(ciudad: str, temp: float, central_ip: str, gui_app=None):
     pass
 
+# --- BUCLE PRINCIPAL ASÍNCRONO --- (Consulta clima y notifica cada 4 segundos)
 async def bucle_clima(env_vars: Dict[str, str], gui_app):
     """
     Recibe gui_app para pasárselo a las notificaciones
@@ -82,7 +83,6 @@ async def bucle_clima(env_vars: Dict[str, str], gui_app):
         await asyncio.sleep(4)
 
 # --- GESTIÓN DE ARCHIVOS ---
-
 def cargar_ciudades_de_txt():
     try:
         carpeta_actual = os.path.dirname(__file__)
@@ -112,7 +112,7 @@ def get_env():
 class WeatherAppGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Weather Control Office (EV_W)")
+        self.root.title("Weather Control Office")
         self.root.geometry("700x550")
 
         # 1. Panel de Gestión (Arriba)
