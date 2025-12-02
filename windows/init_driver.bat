@@ -2,15 +2,15 @@
 cd ..
 setlocal enabledelayedexpansion
 
-REM ===== Cargar variable HOST_IP desde .env =====
+REM ===== Cargar variable CENTRAL_IP desde .env =====
 for /f "usebackq tokens=1,2 delims==" %%a in (".env") do (
-    if "%%a"=="HOST_IP" set HOST_IP=%%b
+    if "%%a"=="CENTRAL_IP" set CENTRAL_IP=%%b
 )
 
 REM Mostrar valor cargado para verificar
-echo HOST_IP cargado: %HOST_IP%
-if "%HOST_IP%"=="" (
-    echo [ERROR] No se encontro HOST_IP en el archivo .env
+echo CENTRAL_IP cargado: %CENTRAL_IP%
+if "%CENTRAL_IP%"=="" (
+    echo [ERROR] No se encontro CENTRAL_IP en el archivo .env
     pause
     exit /b
 )
@@ -29,10 +29,10 @@ if "%FILE%"=="" set FILE=data.json
 REM ===== Ejecutar los scripts en ventanas separadas =====
 if not "%FILE%"=="" (
     echo Iniciando ev_driver.py con archivo en una nueva ventana...
-    start "EV_DRIVER" cmd /k "python ev_driver/ev_driver.py %ID% --broker %HOST_IP%:9092 --file %FILE%"
+    start "EV_DRIVER" cmd /k "python ev_driver/ev_driver.py %ID% --broker %CENTRAL_IP%:9092 --file %FILE%"
 ) else (
     echo Iniciando ev_driver.py sin archivo en una nueva ventana...
-    start "EV_DRIVER" cmd /k "python ev_driver/ev_driver.py %ID% --broker %HOST_IP%:9092"
+    start "EV_DRIVER" cmd /k "python ev_driver/ev_driver.py %ID% --broker %CENTRAL_IP%:9092"
 )
 
 echo Todo iniciado correctamente.

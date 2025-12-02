@@ -2,12 +2,14 @@ import time
 import json
 import socket
 import argparse
+import requests
 
 class Monitor:
     def __init__(
         self, id: str,
         central="localhost:6000",
         engine="localhost:6001",
+        registry="localhost:8000",
     ):
         self.id = id
         self.location = None
@@ -20,6 +22,8 @@ class Monitor:
         self.engine = engine
         self.engine_host, self.engine_port = self.engine.split(":")
         self.engine_port = int(self.engine_port)
+
+        self.registry = f"https://{registry}"
 
     def _send(self, mensaje: dict):
         try:
@@ -70,7 +74,6 @@ class Monitor:
                             return response["status"]
                     except Exception:
                         continue
-
         except (ConnectionRefusedError, socket.timeout):
             pass
 
@@ -81,15 +84,41 @@ class Monitor:
         while self._check_engine() == "AVERIADO":
             time.sleep(1)
 
-        mensaje = {
-            "type": "auth",
-            "id": self.id,
-            "location": self.location,
+        url = self.registry + "/alta"
+        payload = {
+            "cp_id": self.id,
+            "location": self.location or "Unknown Location",
             "price": self.price
         }
+        try:
+            res = requests.put(url, json=payload, verify="registry_cert.pem")
+            res.raise_for_status()
+            data = res.json()
+            if "keys_for_EV_Central" in data:
+                keys = data["keys_for_EV_Central"]
 
-        print(f"[{self.id}] Autenticando Charging Point...")
-        self._send(mensaje)
+                self.auth_key = keys["auth_key"]
+                self.session_key = keys["session_key"]
+
+                print("[AUTH] Autenticado correctamente.")
+                print(keys)
+            else:
+                print("[ERROR] Respuesta inválida del registry.")
+                raise Exception("Respuesta inválida del registry.")
+        except requests.exceptions.HTTPError as e:
+            print(f"Error HTTP: {e}")
+            print("-" * 30)
+            print("LO QUE DICE EL SERVIDOR (El error real):")
+            # Esto imprimirá exactamente qué campo falta o está mal
+            print(json.dumps(res.json(), indent=2)) 
+            print("-" * 30)
+            raise e
+
+        # mensaje = {"type": "keys", "id": self.id, "auth_key": self.auth_key, "session_key": self.session_key}
+        # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        #     s.settimeout(2)
+        #     s.connect((self.engine_host, self.engine_port))
+        #     s.send(json.dumps(mensaje).encode("utf-8"))
 
     def update_status(self, intervalo: int = 1):
         while True:
@@ -110,13 +139,15 @@ if __name__ == "__main__":
     parser.add_argument("id", help="ID del Charging Point")
     parser.add_argument("--central", default="localhost:6000", help="IP de la central")
     parser.add_argument("--engine", default="localhost:6001", help="IP del engine")
+    parser.add_argument("--registry", default="localhost:8000", help="IP del registry")
 
     args = parser.parse_args()
 
     monitor = Monitor(
         id=args.id,
         central=args.central,
-        engine=args.engine
+        engine=args.engine,
+        registry=args.registry
     )
 
     monitor.auth_cp()

@@ -24,6 +24,9 @@ class Engine:
         self.host = "0.0.0.0"
         self.port = port
 
+        self.auth_key: str = None
+        self.session_key: str = None
+
         self.ko_mode: bool = False
         self.can_supply: bool = False
         self.kwh: float = 0.0
@@ -92,6 +95,10 @@ class Engine:
                 if msg.get("type") == "check" and msg.get("id") == self.id:
                     if not self.ko_mode:
                         self.monitor_response(client_socket)
+                elif msg.get("type") == "keys" and msg.get("id") == self.id:
+                    print("[INFO] Claves recibidas")
+                    # self.auth_key = msg.get("auth_key")
+                    # self.session_key = msg.get("session_key")
             except Exception as e:
                 print("[SOCKET] Error procesando mensaje:", e)
 

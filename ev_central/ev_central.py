@@ -47,24 +47,24 @@ class EV_Central:
                         self._notificar_ui()
             time.sleep(1)
 
-    def registrar_punto(self, id: str, msg: dict):
-        punto = {
-            "id": id,
-            "location": msg["location"],
-            "price": msg["price"],
-            "estado": EstadoCP.DESCONECTADO.value,
-            "driver": None,
-            "kwh": 0,
-            "time": None,
-            "auth_key": None,
-            "session_key": None
-        }
+    # def registrar_punto(self, id: str, msg: dict):
+    #     punto = {
+    #         "id": id,
+    #         "location": msg["location"],
+    #         "price": msg["price"],
+    #         "estado": EstadoCP.DESCONECTADO.value,
+    #         "driver": None,
+    #         "kwh": 0,
+    #         "time": None,
+    #         "auth_key": None,
+    #         "session_key": None
+    #     }
 
-        self.db.save_charging_point(punto)
-        gestor.last_msg[id] = time.time()
-        self.db.update_estado(punto["id"], EstadoCP.ACTIVADO.value)
+    #     self.db.save_charging_point(punto)
+    #     gestor.last_msg[id] = time.time()
+    #     self.db.update_estado(punto["id"], EstadoCP.ACTIVADO.value)
         
-        self._notificar_ui()
+    #     self._notificar_ui()
 
     def actualizar_estado(self, id: str, nuevo_estado: EstadoCP):
         cp = self.db.get_charging_point(id)
