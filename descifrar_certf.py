@@ -57,6 +57,6 @@ if __name__ == "__main__":
     try:
         fichero = input("Archivo a leer [certServ.pem]: ").strip() or "certServ.pem"
         secreto = obtener_secreto(fichero)
-        print(f"✅ Secreto recuperado: {secreto}")
+        print(f"Secreto recuperado: {secreto}")
     except Exception as e:
         print(f"Error: {e}")

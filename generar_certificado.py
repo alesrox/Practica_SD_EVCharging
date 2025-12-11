@@ -20,7 +20,7 @@ def pedir_dato(mensaje, defecto):
     return valor if valor else defecto
 
 def generar_certificado_hibrido():
-    print("--- 🛠️ GENERADOR DE CERTIFICADO PEM + SECRETO ---")
+    print("--- GENERADOR DE CERTIFICADO PEM + SECRETO ---")
     
     # 1. PEDIR EL SECRETO
     secreto = input(">> Introduce el SECRETO a proteger (API Key, Token...): ").strip()
@@ -41,7 +41,7 @@ def generar_certificado_hibrido():
     OU = pedir_dato("Organizational Unit (OU)", "SD")
     CN = pedir_dato("Common Name (CN)", "localhost")
 
-    print("\nGenerando criptografía... ⏳")
+    print("\nGenerando criptografía...")
 
     # 2. GENERAR CLAVE PRIVADA (RSA 2048)
     private_key = rsa.generate_private_key(
