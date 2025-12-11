@@ -126,10 +126,6 @@ def get_api():
         print("Asegúrate de haber ejecutado el generador en la carpeta raíz.")
         exit(1)
 
-    print("\n" + "="*50)
-    print("ACCESO SEGURO REQUERIDO")
-    print("="*50)
-
     try:
         # Llamamos a tu módulo importado de la raíz
         api_key = obtener_secreto(ruta_p12)
