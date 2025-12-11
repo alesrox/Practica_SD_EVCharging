@@ -1,6 +1,5 @@
 import os
 import sys
-import getpass
 
 # --- TRUCO PARA IMPORTAR DESDE LA CARPETA RAÍZ ---
 # Obtenemos la ruta de la carpeta superior (..)
