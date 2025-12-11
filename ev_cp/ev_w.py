@@ -7,7 +7,6 @@ import getpass
 ruta_raiz = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # La añadimos al "path" de Python para poder hacer imports
 sys.path.append(ruta_raiz)
-
 # AHORA SÍ PODEMOS IMPORTAR EL MÓDULO QUE ESTÁ FUERA
 try:
     from descifrar_certf import obtener_secreto
@@ -34,7 +33,7 @@ import httpx
 data_lock = threading.Lock()
 
 #Nombre certificado API Key
-CERT_API_NAME = "API_OpenWeather.p12"
+CERT_API_NAME = "API_OpenWeather.pem"
 
 # Datos compartidos
 ciudades_cp: Dict[str, str] = {}
@@ -131,16 +130,13 @@ def get_api():
     print("\n" + "="*50)
     print("ACCESO SEGURO REQUERIDO")
     print("="*50)
-    
-    password = getpass.getpass(">> Introduce la contraseña del certificado: ")
 
     try:
         # Llamamos a tu módulo importado de la raíz
-        api_key = obtener_secreto(ruta_p12, password)
-        print("Identidad verificada. Clave extraída.")
+        api_key = obtener_secreto(ruta_p12)
         return api_key
     except Exception as e:
-        print(f"Error de seguridad o contraseña incorrecta: {e}")
+        print(f"Error con el certificado: {e}")
         exit(1)
 
 def get_env():

@@ -1,56 +1,47 @@
 import os
-from cryptography.hazmat.primitives.serialization import pkcs12
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.backends import default_backend
 
-# Debe coincidir con el del generador
+# Debe coincidir con el generador
 MAGIC_SEPARATOR = b"||__SECRET_PAYLOAD__||"
 
-def obtener_secreto(ruta_archivo: str, password: str) -> str:
+def obtener_secreto(ruta_cert: str, password=None) -> str:
     """
-    Desencripta un archivo .p12 híbrido (Método Canguro) y devuelve el secreto oculto.
-    
-    Args:
-        ruta_archivo (str): Ruta al archivo .p12
-        password (str): Contraseña para desbloquear el certificado
-        
-    Returns:
-        str: El secreto desencriptado (API Key, Token, etc.)
-        
-    Raises:
-        FileNotFoundError: Si el archivo no existe.
-        ValueError: Si la contraseña es incorrecta o el formato no es válido.
+    Lee un archivo PEM Híbrido y extrae el secreto oculto al final.
+    El password se ignora porque estos PEMs se generan sin contraseña (-nodes).
     """
-    
-    if not os.path.exists(ruta_archivo):
-        raise FileNotFoundError(f"No se encuentra el archivo: {ruta_archivo}")
+    if not os.path.exists(ruta_cert):
+        raise FileNotFoundError(f"No se encuentra el archivo: {ruta_cert}")
 
-    # 1. Leer archivo binario
-    with open(ruta_archivo, "rb") as f:
+    # 1. Leer archivo completo
+    with open(ruta_cert, "rb") as f:
         contenido_total = f.read()
 
-    # 2. Buscar el separador y cortar
+    # 2. Separar PEM del Secreto
     if MAGIC_SEPARATOR not in contenido_total:
-        raise ValueError("El archivo no tiene el formato híbrido esperado (Falta el separador).")
+        raise ValueError("El archivo no tiene un secreto inyectado (Formato incorrecto).")
+    
+    # Partimos el archivo en dos trozos usando el separador
+    partes = contenido_total.split(MAGIC_SEPARATOR, 1)
+    pem_data = partes[0]        # Lo de arriba (Key + Cert)
+    encrypted_secret = partes[1] # Lo de abajo (Secreto)
 
-    p12_bytes, encrypted_payload = contenido_total.split(MAGIC_SEPARATOR, 1)
-
+    # 3. Cargar la Clave Privada desde la parte PEM
+    # Usamos password=None porque el generador usó NoEncryption
     try:
-        # 3. Desbloquear el contenedor PKCS#12
-        # Esto valida la contraseña y nos da la Clave Privada
-        private_key, certificate, _ = pkcs12.load_key_and_certificates(
-            p12_bytes,
-            password.encode(),
+        private_key = serialization.load_pem_private_key(
+            pem_data,
+            password=None, 
             backend=default_backend()
         )
-    except ValueError:
-        raise ValueError("Contraseña incorrecta.")
+    except Exception as e:
+        raise ValueError(f"Error leyendo la clave privada del PEM: {e}")
 
-    # 4. Desencriptar el Payload usando la Clave Privada
+    # 4. Desencriptar el secreto
     try:
         decrypted_bytes = private_key.decrypt(
-            encrypted_payload,
+            encrypted_secret,
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
@@ -59,4 +50,13 @@ def obtener_secreto(ruta_archivo: str, password: str) -> str:
         )
         return decrypted_bytes.decode('utf-8')
     except Exception as e:
-        raise ValueError(f"Error al desencriptar el payload: {e}")
+        raise ValueError(f"Fallo al desencriptar. ¿Es el archivo correcto? {e}")
+
+# Prueba rápida si ejecutas este fichero
+if __name__ == "__main__":
+    try:
+        fichero = input("Archivo a leer [certServ.pem]: ").strip() or "certServ.pem"
+        secreto = obtener_secreto(fichero)
+        print(f"✅ Secreto recuperado: {secreto}")
+    except Exception as e:
+        print(f"Error: {e}")

@@ -1,71 +1,93 @@
-''' 
-Este programa genera un archivo .p12 (PKCS#12) con CUALQUIER secreto 
-pegado al final de forma segura (Método Canguro Genérico).
-'''
+# generar_certificado.py
 
-import getpass
+"""Generador de certificado X.509 en formato PEM que incluye un secreto oculto.
+El secreto se cifra usando la clave pública del certificado y se almacena"""
+
 import os
 import datetime
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.hazmat.backends import default_backend
 
-# MARCA DE SEPARACIÓN (Importante para que el lector sepa dónde cortar)
+# MARCA DE SEPARACIÓN (Protocolo Canguro)
 MAGIC_SEPARATOR = b"||__SECRET_PAYLOAD__||"
 
-def generar_identidad_generica():
-    print("--- GENERADOR DE IDENTIDAD SEGURA (CANGURO / ONE-FILE) ---")
+def pedir_dato(mensaje, defecto):
+    """Ayuda para pedir datos con un valor por defecto"""
+    valor = input(f"{mensaje} [{defecto}]: ").strip()
+    return valor if valor else defecto
+
+def generar_certificado_hibrido():
+    print("--- 🛠️ GENERADOR DE CERTIFICADO PEM + SECRETO ---")
     
-    # 1. SOLICITUD DE DATOS GENÉRICOS
-    nombre_archivo = input("Nombre para el archivo (sin extensión): ").strip()
-    if not nombre_archivo:
-        print("El nombre es obligatorio.")
-        return
-
-    secreto = input("Introduce el DATO SECRETO a proteger (API Key, Token, Password...): ").strip()
+    # 1. PEDIR EL SECRETO
+    secreto = input(">> Introduce el SECRETO a proteger (API Key, Token...): ").strip()
     if not secreto:
-        print("El secreto no puede estar vacío.")
+        print("El secreto es obligatorio.")
         return
 
-    password = getpass.getpass(f"Crea una contraseña para proteger '{nombre_archivo}.p12': ").strip()
-    if not password:
-        print("La contraseña es obligatoria.")
-        return
+    nombre_fichero = input("Nombre del archivo de salida").strip()
+    if not nombre_fichero:
+        raise ValueError("El nombre del archivo es obligatorio.")
+    nombre_fichero = nombre_fichero if nombre_fichero.endswith(".pem") else nombre_fichero + ".pem"
 
-    print("\nGenerando criptografía... (esto puede tardar un segundo)")
+    print("\n--- DATOS DEL CERTIFICADO X.509 ---")
+    C  = pedir_dato("Country Name (C)", "ES")
+    ST = pedir_dato("State/Province (ST)", "Comunidad Valenciana")
+    L  = pedir_dato("Locality (L)", "Alicante")
+    O  = pedir_dato("Organization (O)", "UA")
+    OU = pedir_dato("Organizational Unit (OU)", "SD")
+    CN = pedir_dato("Common Name (CN)", "localhost")
 
-    # 2. Generar Clave Privada RSA (2048 bits)
+    print("\nGenerando criptografía... ⏳")
+
+    # 2. GENERAR CLAVE PRIVADA (RSA 2048)
     private_key = rsa.generate_private_key(
-        public_exponent=65537, key_size=2048, backend=default_backend()
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend()
     )
 
-    # 3. Crear Certificado Autofirmado (Contenedor público)
+    # 3. CREAR EL CERTIFICADO
     subject = x509.Name([
-        x509.NameAttribute(NameOID.COMMON_NAME, f"{nombre_archivo}_User"),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"Security Module"),
+        x509.NameAttribute(NameOID.COUNTRY_NAME, C),
+        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, ST),
+        x509.NameAttribute(NameOID.LOCALITY_NAME, L),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, O),
+        x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, OU),
+        x509.NameAttribute(NameOID.COMMON_NAME, CN),
     ])
-    
-    cert = x509.CertificateBuilder().subject_name(subject).issuer_name(subject).public_key(
+
+    cert = x509.CertificateBuilder().subject_name(
+        subject
+    ).issuer_name(
+        subject
+    ).public_key(
         private_key.public_key()
-    ).serial_number(x509.random_serial_number()).not_valid_before(
+    ).serial_number(
+        x509.random_serial_number()
+    ).not_valid_before(
         datetime.datetime.utcnow()
     ).not_valid_after(
-        datetime.datetime.utcnow() + datetime.timedelta(days=3650) # Valido 10 años
-    ).sign(private_key, hashes.SHA256(), default_backend())
-
-    # 4. Empaquetar Clave + Cert en formato estándar P12
-    p12_data = pkcs12.serialize_key_and_certificates(
-        name=nombre_archivo.encode('utf-8'),
-        key=private_key,
-        cert=cert,
-        cas=None,
-        encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
+        datetime.datetime.utcnow() + datetime.timedelta(days=365)
+    ).sign(
+        private_key, hashes.SHA256(), default_backend()
     )
 
-    # 5. ENCRIPTAR EL SECRETO (Usando la parte pública del certificado)
+    # 4. SERIALIZAR A PEM
+    # Clave Privada SIN contraseña (equivale a -nodes)
+    pem_key = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    
+    # Certificado Público
+    pem_cert = cert.public_bytes(serialization.Encoding.PEM)
+
+    # 5. ENCRIPTAR EL SECRETO (Usando la parte pública del propio cert)
     public_key = cert.public_key()
     encrypted_secret = public_key.encrypt(
         secreto.encode(),
@@ -76,19 +98,15 @@ def generar_identidad_generica():
         )
     )
 
-    # 6. FUSIÓN: Escribir P12 + Separador + Secreto Encriptado
-    filename_completo = f"{nombre_archivo}.p12"
-    
-    with open(filename_completo, "wb") as f:
-        f.write(p12_data)       # Identidad estándar
-        f.write(MAGIC_SEPARATOR) # Frontera
-        f.write(encrypted_secret) # Carga útil oculta
+    # 6. GUARDAR TODO EN UN SOLO ARCHIVO
+    with open(nombre_fichero, "wb") as f:
+        f.write(pem_key)         # Clave Privada
+        f.write(pem_cert)        # Certificado
+        f.write(MAGIC_SEPARATOR) # Separador
+        f.write(encrypted_secret)# Secreto Oculto
 
-    print("\n✅ GENERADO CON ÉXITO.")
-    print(f"Archivo: {filename_completo}")
-    print("----------------------------------------------------------------")
-    print("Este archivo contiene tu identidad digital y el secreto encriptado.")
-    print("Para leerlo, tu programa necesitará buscar la marca separadora." + f" ({MAGIC_SEPARATOR.decode()})")
+    print(f"\nÉXITO. Archivo generado: '{nombre_fichero}'")
+    print("Este archivo sirve para HTTPS y contiene tu secreto oculto.")
 
 if __name__ == "__main__":
-    generar_identidad_generica()
+    generar_certificado_hibrido()
