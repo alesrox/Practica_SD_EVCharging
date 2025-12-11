@@ -1,6 +1,7 @@
 import time
 import json
 
+from cryptography.fernet import Fernet
 from concurrent.futures import ThreadPoolExecutor
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 
@@ -57,7 +58,12 @@ class Kafka_Handler:
                             raise KafkaException(msg.error())
                         continue
                     try:
-                        data = json.loads(msg.value().decode("utf-8"))
+                        fernet = Fernet(
+                            self.gestor.get_key(msg.key().decode("utf-8"))
+                        )
+
+                        decrypted_bytes = fernet.decrypt(msg.value())
+                        data = json.loads(decrypted_bytes.decode("utf-8"))
                         executor.submit(self.procesar_msg, data)
                     except Exception as e:
                         print(f"[KAFKA] Mensaje no válido recibido: {e}")

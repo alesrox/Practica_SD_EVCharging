@@ -7,6 +7,8 @@ import argparse
 import threading
 import tkinter as tk
 
+from cryptography.fernet import Fernet
+
 from concurrent.futures import ThreadPoolExecutor
 from confluent_kafka import Producer, Consumer, KafkaError, KafkaException
 
@@ -24,8 +26,7 @@ class Engine:
         self.host = "0.0.0.0"
         self.port = port
 
-        self.auth_key: str = None
-        self.session_key: str = None
+        self.token = None
 
         self.ko_mode: bool = False
         self.can_supply: bool = False
@@ -95,10 +96,10 @@ class Engine:
                 if msg.get("type") == "check" and msg.get("id") == self.id:
                     if not self.ko_mode:
                         self.monitor_response(client_socket)
-                elif msg.get("type") == "keys" and msg.get("id") == self.id:
+                elif msg.get("type") == "key" and msg.get("id") == self.id:
                     print("[INFO] Claves recibidas")
-                    # self.auth_key = msg.get("auth_key")
-                    # self.session_key = msg.get("session_key")
+                    self.token = msg.get("key")
+                    self.token = self.token
             except Exception as e:
                 print("[SOCKET] Error procesando mensaje:", e)
 
@@ -163,7 +164,15 @@ class Engine:
                 self._loop_confirm_msg = False
 
     def send_kafka_msg(self, msg):
-        self.producer.produce(self.producer_topic, json.dumps(msg).encode("utf-8"))
+        fernet = Fernet(self.token)
+        msg_json = json.dumps(msg).encode("utf-8")
+        msg_encrypted = fernet.encrypt(msg_json)
+
+        self.producer.produce(
+            self.producer_topic, 
+            key=self.id.encode("utf-8"),
+            value=msg_encrypted,
+        )
         self.producer.flush(timeout=5)
 
     def supply_request(self, data):
@@ -177,8 +186,8 @@ class Engine:
 
         response = {
             "id": c_id,
-            "type": "supply_response",
             "cp": self.id,
+            "type": "supply_response",
             "driver": driver,
             "status": status,
             "zone": self.location,

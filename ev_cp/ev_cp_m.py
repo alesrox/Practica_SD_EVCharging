@@ -15,6 +15,9 @@ class Monitor:
         self.location = None
         self.price = 0
 
+        self.token = None
+        self.key = None
+
         self.central = central
         self.central_host, self.central_port = self.central.split(":")
         self.central_port = int(self.central_port)
@@ -79,6 +82,26 @@ class Monitor:
 
         print("[INFO] Engine Status: KO")
         return "AVERIADO"
+    
+    def autenticar(self):
+        mensaje = {"type": "auth", "id": self.id, "token": self.token}
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(2)
+            s.connect((self.central_host, self.central_port))
+            s.send(json.dumps(mensaje).encode("utf-8"))
+            data = s.recv(4096) 
+            if not data:
+                print("No se recibió respuesta.")
+                exit(1)
+
+            respuesta = json.loads(data.decode("utf-8"))
+            if respuesta.get("status") == "FAIL":
+                print("Autenticación fallida.")
+                exit(1)
+            
+            if respuesta.get("status") == "OK":
+                clave_b64 = respuesta.get("key")
+                self.key = clave_b64
 
     def auth_cp(self):
         while self._check_engine() == "AVERIADO":
@@ -91,17 +114,12 @@ class Monitor:
             "price": self.price
         }
         try:
-            res = requests.put(url, json=payload, verify="registry_cert.pem")
+            res = requests.put(url, json=payload, verify=False, timeout=5)
             res.raise_for_status()
             data = res.json()
-            if "keys_for_EV_Central" in data:
-                keys = data["keys_for_EV_Central"]
-
-                self.auth_key = keys["auth_key"]
-                self.session_key = keys["session_key"]
-
+            if "token" in data:
+                self.token = data["token"]
                 print("[AUTH] Autenticado correctamente.")
-                print(keys)
             else:
                 print("[ERROR] Respuesta inválida del registry.")
                 raise Exception("Respuesta inválida del registry.")
@@ -114,11 +132,12 @@ class Monitor:
             print("-" * 30)
             raise e
 
-        # mensaje = {"type": "keys", "id": self.id, "auth_key": self.auth_key, "session_key": self.session_key}
-        # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        #     s.settimeout(2)
-        #     s.connect((self.engine_host, self.engine_port))
-        #     s.send(json.dumps(mensaje).encode("utf-8"))
+        self.autenticar()
+        mensaje = {"type": "key", "id": self.id, "key": self.key}
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(2)
+            s.connect((self.engine_host, self.engine_port))
+            s.send(json.dumps(mensaje).encode("utf-8"))
 
     def update_status(self, intervalo: int = 1):
         while True:

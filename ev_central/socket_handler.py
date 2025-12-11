@@ -48,15 +48,27 @@ class Socket_Handler:
 
             except Exception as e:
                 print(f"[SOCKET] Error procesando mensaje ({msg_type}): {e}")
+                print(msg)
                 client.send(b"ERROR")
 
     def _handle_auth(self, client, msg):
-        self.gestor.registrar_punto(msg["id"], msg)
-        response = {"type": "auth", "id": msg["id"], "status": "OK"}
+        response = None
+        key = self.gestor.autenticar_cp(msg["id"], msg.get("token"))
+
+        if not key:
+            response = {"type": "auth", "id": msg["id"], "status": "FAIL"}
+        else:
+            response = {
+                "type": "auth", 
+                "id": msg["id"], 
+                "status": "OK",
+                "key": key
+            }
+
         client.send(json.dumps(response).encode("utf-8"))
 
     def _handle_status(self, client, msg):
-        estado = EstadoCP[msg.get("status", "AVERIADO")]
+        estado = msg.get("status", "AVERIADO")
         self.gestor.actualizar_estado(msg["id"], estado)
         response = {"type": "status", "id": msg["id"], "status": "OK"}
         client.send(json.dumps(response).encode("utf-8"))
