@@ -1,4 +1,20 @@
 import os
+import sys
+import getpass
+
+# --- TRUCO PARA IMPORTAR DESDE LA CARPETA RAÍZ ---
+# Obtenemos la ruta de la carpeta superior (..)
+ruta_raiz = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+# La añadimos al "path" de Python para poder hacer imports
+sys.path.append(ruta_raiz)
+
+# AHORA SÍ PODEMOS IMPORTAR EL MÓDULO QUE ESTÁ FUERA
+try:
+    from descifrar_certf import obtener_secreto
+except ImportError:
+    print("Error: No encuentro 'descifrar_certf.py' en la carpeta raíz.")
+    exit(1)
+
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from dotenv import load_dotenv
@@ -16,6 +32,9 @@ import httpx
 
 # Bloqueo para acceso seguro a datos compartidos
 data_lock = threading.Lock()
+
+#Nombre certificado API Key
+CERT_API_NAME = "API_OpenWeather.p12"
 
 # Datos compartidos
 ciudades_cp: Dict[str, str] = {}
@@ -96,11 +115,41 @@ def cargar_ciudades_de_txt():
     except FileNotFoundError:
         pass
 
+def get_api():
+    """
+    Busca el certificado en la raíz, pide contraseña y devuelve la API Key desencriptada.
+    """
+    carpeta_actual = os.path.dirname(__file__)
+    # La ruta cambia aquí porque el p12 está en la raíz (..)
+    ruta_p12 = os.path.join(carpeta_actual, "..", CERT_API_NAME)
+
+    if not os.path.exists(ruta_p12):
+        print(f"Error crítico: No encuentro '{CERT_API_NAME}' en: {ruta_p12}")
+        print("Asegúrate de haber ejecutado el generador en la carpeta raíz.")
+        exit(1)
+
+    print("\n" + "="*50)
+    print("ACCESO SEGURO REQUERIDO")
+    print("="*50)
+    
+    password = getpass.getpass(">> Introduce la contraseña del certificado: ")
+
+    try:
+        # Llamamos a tu módulo importado de la raíz
+        api_key = obtener_secreto(ruta_p12, password)
+        print("Identidad verificada. Clave extraída.")
+        return api_key
+    except Exception as e:
+        print(f"Error de seguridad o contraseña incorrecta: {e}")
+        exit(1)
+
 def get_env():
     env_vars = {}
     try:
+        env_vars['WEATHER_API_KEY'] = get_api()
+
         load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
-        env_vars = {'WEATHER_API_KEY': os.getenv('WEATHER_API_KEY'), 'WEATHER_API_URL': os.getenv('WEATHER_API_URL')}
+        env_vars['WEATHER_API_URL'] = os.getenv('WEATHER_API_URL')
         load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
         env_vars['CENTRAL_IP'] = os.getenv('HOST_IP')
         return env_vars
