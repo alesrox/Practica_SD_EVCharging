@@ -2,9 +2,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
-import requests
-import secrets
-import json
 
 from db import EVCentralAPI
 
@@ -22,6 +19,7 @@ DB = EVCentralAPI(DB_URL)
 def get_all_cps():
     return DB.load_charging_points()
 
+# TODO: Añadir certificación
 if __name__ == "__main__":
     uvicorn.run(
         "api_central:app", 
