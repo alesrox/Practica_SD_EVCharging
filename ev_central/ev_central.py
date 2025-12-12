@@ -17,23 +17,18 @@ DB_URL = "http://localhost:9000"
 
 class EV_Central:
     def __init__(
-        self, ui_callback = None, 
+        self, 
         broker: str = "localhost:9092", 
-        port: int = 6000
+        port: int = 6000,
     ):
         self.db = EVCentralAPI(DB_URL)
         self.db.reset_all_charging_points()
         self.last_msg: Dict[str, float] = {}
-        self.ui_callback = ui_callback
 
         self.tickets = []
 
         self.socket_handler = Socket_Handler(self, port=port)
         self.kafka_handler = Kafka_Handler(self, broker)
-
-    def _notificar_ui(self):
-        if self.ui_callback:
-            self.ui_callback(self.db.load_charging_points())
 
     def check_timeouts(self, timeout=5):
         while True:
@@ -46,7 +41,6 @@ class EV_Central:
                     
                     if cp["estado"] != EstadoCP.DESCONECTADO.value:
                         self.db.update_estado(cp_id, EstadoCP.DESCONECTADO.value)
-                        self._notificar_ui()
             time.sleep(1)
 
     def autenticar_cp(self, id: str, token: str) -> bool:
@@ -91,7 +85,6 @@ class EV_Central:
 
         self.db.update_estado(cp["id"], nuevo_estado)
         gestor.last_msg[id] = time.time()
-        self._notificar_ui()
 
     def topic(self, zone):
         _zone = zone.replace(" ", "").lower()
@@ -253,7 +246,7 @@ class EV_Central:
             if zone:
                 self.kafka_handler.send_msg(data, self.topic(zone))
 
-        self._notificar_ui()
+        # self._notificar_ui()
 
     def finalizar_suministro(self, data, error=False):
         id = data.get("id")
@@ -339,10 +332,7 @@ if __name__ == "__main__":
         port = args.port
     )
 
-    ui = EV_Central_UI(gestor)
-
-    threading.Thread(target=gestor.check_timeouts, daemon=True).start()
     threading.Thread(target=gestor.socket_handler.start_listener, daemon=True).start()
     threading.Thread(target=gestor.kafka_handler.start_listener, daemon=True).start()
-
-    ui.run()
+    
+    gestor.check_timeouts()

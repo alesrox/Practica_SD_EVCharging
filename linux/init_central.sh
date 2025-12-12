@@ -30,7 +30,7 @@ EOF
 
 # Ejecutar ev_central con el broker
 run_in_new_terminal "uvicorn db.server:app --host 0.0.0.0 --port 9000 --reload"
-# SERVER_PID=$!
+run_in_new_terminal "python3.11 ev_central/api_central.py"
 
 echo "Esperando a que el servidor FastAPI esté listo..."
 while ! curl -s http://localhost:9000/charging_points > /dev/null; do
@@ -38,4 +38,3 @@ while ! curl -s http://localhost:9000/charging_points > /dev/null; do
 done
 
 python3.11 ev_central/ev_central.py --broker localhost:9092
-# kill $SERVER_PID
