@@ -118,17 +118,15 @@ def get_api():
     Busca el certificado en la raíz, pide contraseña y devuelve la API Key desencriptada.
     """
     carpeta_actual = os.path.dirname(__file__)
-    # La ruta cambia aquí porque el p12 está en la raíz (..)
-    ruta_p12 = os.path.join(carpeta_actual, "..", CERT_API_NAME)
+    ruta_pem = os.path.join(carpeta_actual, "..", CERT_API_NAME)
 
-    if not os.path.exists(ruta_p12):
-        print(f"Error crítico: No encuentro '{CERT_API_NAME}' en: {ruta_p12}")
+    if not os.path.exists(ruta_pem):
+        print(f"Error crítico: No encuentro '{CERT_API_NAME}' en: {ruta_pem}")
         print("Asegúrate de haber ejecutado el generador en la carpeta raíz.")
         exit(1)
 
     try:
-        # Llamamos a tu módulo importado de la raíz
-        api_key = obtener_secreto(ruta_p12)
+        api_key = obtener_secreto(ruta_pem)
         return api_key
     except Exception as e:
         print(f"Error con el certificado: {e}")
