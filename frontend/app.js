@@ -1,19 +1,60 @@
 const API_URL = 'http://localhost:7500/charging_points';
-const REFRESH_INTERVAL = 2000; // Cada 2 segundos
+const REFRESH_INTERVAL = 2000; 
 
 const container = document.getElementById('cp-container');
+const logOngoingBody = document.getElementById('log-ongoing-body');
+const ongoingPlaceholder = document.getElementById('ongoing-placeholder');
+const logApp = document.getElementById('log-app');
+const appPlaceholder = document.getElementById('app-placeholder');
 const lastUpdatedSpan = document.getElementById('last-updated');
 const connectionStatusSpan = document.getElementById('connection-status');
+
+function getDateParts(timestamp) {
+    if (!timestamp) return { date: '-', time: '-' };
+    const dateObj = new Date(timestamp * 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    
+    return {
+        date: `${pad(dateObj.getDate())}/${pad(dateObj.getMonth() + 1)}/${dateObj.getFullYear()}`,
+        time: `${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}:${pad(dateObj.getSeconds())}`
+    };
+}
 
 function getStatusClass(estado) {
     if (!estado) return 'bg-default';
     const s = estado.toUpperCase();
-    if (s === 'ACTIVADO') return 'bg-activado';
-    if (s === 'SUMINISTRANDO') return 'bg-suministrando';
-    if (s === 'PARADO') return 'bg-parado';
-    if (s === 'AVERIADO') return 'bg-averiado';
-    if (s === 'DESCONECTADO') return 'bg-desconectado';
-    return 'bg-default';
+    const map = {
+        'ACTIVADO': 'bg-activado',
+        'SUMINISTRANDO': 'bg-suministrando',
+        'PARADO': 'bg-parado',
+        'AVERIADO': 'bg-averiado',
+        'DESCONECTADO': 'bg-desconectado'
+    };
+    return map[s] || 'bg-default';
+}
+
+function getCardHTML(punto) {
+    let html = `
+        <div class="cp-status">${punto.estado || 'DESCONOCIDO'}</div>
+        <div class="cp-id">ID: ${punto.id}</div>
+        <div class="cp-info">${punto.location}</div>
+        <div class="cp-info">${punto.price} €/kWh</div>
+    `;
+
+    if (punto.estado && punto.estado.toUpperCase() === 'SUMINISTRANDO') {
+        const kwh = parseFloat(punto.kwh || 0);
+        const precio = parseFloat(punto.price || 0);
+        const ticket = (kwh * precio).toFixed(2);
+        
+        html += `
+            <div class="cp-info" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.3); padding-top: 5px; width: 100%; text-align: center;">
+                Driver: ${punto.driver || 'N/A'}<br>
+                Consumo: ${kwh.toFixed(2)} kWh<br>
+                Importe: ${ticket} €
+            </div>
+        `;
+    }
+    return html;
 }
 
 async function updateUI() {
@@ -27,45 +68,77 @@ async function updateUI() {
         connectionStatusSpan.textContent = "Conectado";
         connectionStatusSpan.className = "conn-ok";
 
-        container.innerHTML = ''; 
+        const currentIds = new Set();
         Object.values(data).forEach(punto => {
-            const card = document.createElement('div');
-            const bgClass = getStatusClass(punto.estado);
-            card.className = `cp-card ${bgClass}`;
+            currentIds.add(String(punto.id));
+            const cardId = `cp-card-${punto.id}`;
+            let cardElement = document.getElementById(cardId);
+            const newClass = `cp-card ${getStatusClass(punto.estado)}`;
+            const newHTML = getCardHTML(punto);
 
-            card.onclick = () => {
-                alert(`ID: ${punto.id}`);
-            };
+            if (cardElement) {
+                if (cardElement.className !== newClass) cardElement.className = newClass;
+                if (cardElement.innerHTML !== newHTML) cardElement.innerHTML = newHTML;
+            } else {
+                cardElement = document.createElement('div');
+                cardElement.id = cardId;
+                cardElement.className = newClass;
+                cardElement.innerHTML = newHTML;
+                cardElement.onclick = () => alert(`Punto ID: ${punto.id}`);
+                container.appendChild(cardElement);
+            }
+        });
+        
+        Array.from(container.children).forEach(child => {
+            const idNum = child.id.replace('cp-card-', '');
+            if (!currentIds.has(idNum)) container.removeChild(child);
+        });
 
-            // Datos SIEMPRE visibles
-            let htmlContent = `
-                <div class="cp-status">${punto.estado || 'DESCONOCIDO'}</div>
-                <div class="cp-id">ID: ${punto.id}</div>
-                <div class="cp-info">${punto.location}</div>
-                <div class="cp-info">${punto.price} €/kWh</div>
-            `;
+        let ongoingRows = '';
+        let appMessages = '';
+        let hasOngoing = false;
+        let hasAlerts = false;
 
-            // Datos SOLO visibles si SUMINISTRANDO
-            if (punto.estado && punto.estado.toUpperCase() === 'SUMINISTRANDO') {
-                const kwh = parseFloat(punto.kwh || 0);
-                const precio = parseFloat(punto.price || 0);
-                const ticket = (kwh * precio).toFixed(2);
+        Object.values(data).forEach(punto => {
+            const estadoUpper = punto.estado ? punto.estado.toUpperCase() : "";
 
-                htmlContent += `
-                    <div class="cp-info" style="margin-top: 5px;">Driver: ${punto.driver || 'N/A'}</div>
-                    <div class="cp-info">Consumo: ${kwh.toFixed(2)} kWh</div>
-                    <div class="cp-info">Importe: ${ticket} €</div>
+            if (estadoUpper === 'SUMINISTRANDO') {
+                hasOngoing = true;
+                const { date, time } = getDateParts(punto.time);
+                ongoingRows += `
+                    <tr>
+                        <td style="font-weight: bold;">${date}</td>
+                        <td>${time}</td>
+                        <td><span style="background: #e8f8f5; color: #27ae60; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${punto.id}</span></td>
+                        <td>${punto.driver || 'N/A'}</td>
+                    </tr>
                 `;
             }
 
-            card.innerHTML = htmlContent;
-            container.appendChild(card);
+            if (estadoUpper === 'PARADO') {
+                hasAlerts = true;
+                appMessages += `
+                    <div class="alert-item">
+                        <span class="alert-icon">⚠️</span>
+                        <div>
+                            <strong>Punto [${punto.id}]</strong> está fuera de servicio (Out of Order).
+                        </div>
+                    </div>
+                `;
+            }
         });
+
+        if (logOngoingBody.innerHTML !== ongoingRows) logOngoingBody.innerHTML = ongoingRows;
+        ongoingPlaceholder.style.display = hasOngoing ? 'none' : 'block';
+
+        if (logApp.innerHTML !== appMessages) logApp.innerHTML = appMessages;
+        appPlaceholder.style.display = hasAlerts ? 'none' : 'block';
+
 
     } catch (error) {
         console.error("Error fetching data:", error);
-        connectionStatusSpan.textContent = "Error de Conexión";
-        connectionStatusSpan.className = "conn-error"; // Color rojo
+        connectionStatusSpan.textContent = "Sin Conexión";
+        connectionStatusSpan.className = "conn-error";
     }
 }
 
