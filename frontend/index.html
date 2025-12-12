@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV CENTRAL UI</title>
+    <link rel="stylesheet" href="styles.css"> 
+</head>
+<body>
+    <div class="header-container">
+        <h1 class="window-title">PANEL DE CONTROL</h1>
+        <div class="status-bar">
+            Última actualización: <span id="last-updated">---</span>
+            <span class="separator">|</span>
+            Estado: <span id="connection-status">Conectando...</span>
+        </div>
+    </div>
+
+    <div class="main-wrapper">
+        <div class="section-title">PUNTOS DE CARGA</div>
+        <div class="main-frame">
+            <div id="cp-container" class="grid-container"></div>
+        </div>
+
+        <div class="info-panel-grid">
+            <div class="log-section">
+                <h3 class="log-title">ON_GOING DRIVERS REQUESTS</h3>
+                <div class="table-container">
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>FECHA</th>
+                                <th>HORA</th>
+                                <th>CP ID</th>
+                                <th>DRIVER</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-ongoing-body"></tbody>
+                    </table>
+                    <div id="ongoing-placeholder" class="empty-msg">No hay cargas activas</div>
+                </div>
+            </div>
+
+            <div class="log-section">
+                <h3 class="log-title">⚠️ APPLICATION MESSAGES ⚠️</h3>
+                <div id="log-app" class="messages-box"></div>
+                <div id="app-placeholder" class="empty-msg">Sistema funcionando correctamente</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

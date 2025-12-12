@@ -1,9 +1,11 @@
 from typing import Dict
 
+import os
 import uuid
 import time
 import argparse
 import threading
+from cryptography.fernet import Fernet
 
 from db import EVCentralAPI
 from charging_point import EstadoCP
@@ -15,23 +17,18 @@ DB_URL = "http://localhost:9000"
 
 class EV_Central:
     def __init__(
-        self, ui_callback = None, 
+        self, 
         broker: str = "localhost:9092", 
-        port: int = 6000
+        port: int = 6000,
     ):
         self.db = EVCentralAPI(DB_URL)
         self.db.reset_all_charging_points()
         self.last_msg: Dict[str, float] = {}
-        self.ui_callback = ui_callback
 
         self.tickets = []
 
         self.socket_handler = Socket_Handler(self, port=port)
         self.kafka_handler = Kafka_Handler(self, broker)
-
-    def _notificar_ui(self):
-        if self.ui_callback:
-            self.ui_callback(self.db.load_charging_points())
 
     def check_timeouts(self, timeout=5):
         while True:
@@ -42,36 +39,32 @@ class EV_Central:
                     if cp is None:
                         continue
                     
-                    if cp["estado"] != EstadoCP.DESCONECTADO:
+                    if cp["estado"] != EstadoCP.DESCONECTADO.value:
                         self.db.update_estado(cp_id, EstadoCP.DESCONECTADO.value)
-                        self._notificar_ui()
             time.sleep(1)
 
-    # def registrar_punto(self, id: str, msg: dict):
-    #     punto = {
-    #         "id": id,
-    #         "location": msg["location"],
-    #         "price": msg["price"],
-    #         "estado": EstadoCP.DESCONECTADO.value,
-    #         "driver": None,
-    #         "kwh": 0,
-    #         "time": None,
-    #         "auth_key": None,
-    #         "session_key": None
-    #     }
-
-    #     self.db.save_charging_point(punto)
-    #     gestor.last_msg[id] = time.time()
-    #     self.db.update_estado(punto["id"], EstadoCP.ACTIVADO.value)
+    def autenticar_cp(self, id: str, token: str) -> bool:
+        db_cp = self.db.get_charging_point(id)
+        db_token = db_cp.get("token")
+        if token == db_token:
+            self.last_msg[id] = time.time()
+            key = Fernet.generate_key().decode("utf-8")
+            db_cp["token"] = key
+            self.db.save_charging_point(db_cp)
+            return key
         
-    #     self._notificar_ui()
+        return None
+    
+    def get_key(self, id: str):
+        db_token = self.db.get_charging_point(id).get("token")
+        return db_token
 
     def actualizar_estado(self, id: str, nuevo_estado: EstadoCP):
         cp = self.db.get_charging_point(id)
         if cp is None: return
 
-        cond_av = nuevo_estado == EstadoCP.AVERIADO
-        cond_su = cp["estado"] == EstadoCP.SUMINISTRANDO
+        cond_av = nuevo_estado == EstadoCP.AVERIADO.value
+        cond_su = cp["estado"] == EstadoCP.SUMINISTRANDO.value
 
         if cond_av and cond_su:
             data = {
@@ -82,17 +75,16 @@ class EV_Central:
             }
             self.finalizar_suministro(data, True)
 
-        cond_init_su = nuevo_estado == EstadoCP.SUMINISTRANDO and not cp["time"]
+        cond_init_su = nuevo_estado == EstadoCP.SUMINISTRANDO.value and not cp["time"]
         if cond_init_su:
             cp["time"] = time.time()
             self.db.start_time(id, cp["time"])
-        elif nuevo_estado == EstadoCP.ACTIVADO:
+        elif nuevo_estado == EstadoCP.ACTIVADO.value:
             cp["time"] = None
             self.db.start_time(id, None)
 
-        self.db.update_estado(cp["id"], nuevo_estado.value)
+        self.db.update_estado(cp["id"], nuevo_estado)
         gestor.last_msg[id] = time.time()
-        self._notificar_ui()
 
     def topic(self, zone):
         _zone = zone.replace(" ", "").lower()
@@ -105,7 +97,7 @@ class EV_Central:
         
         print(f"[INFO] Solicitud de suministro recibida de {cp_id} ({id})")
         cp = self.db.get_charging_point(cp_id)
-        status = "approved" if cp["estado"] == EstadoCP.ACTIVADO else "denied"
+        status = "approved" if cp["estado"] == EstadoCP.ACTIVADO.value else "denied"
 
         response = {
             "id": id,
@@ -143,7 +135,7 @@ class EV_Central:
 
         if cp is None:
             print(f"[INFO] {cp_id} no está registrado")
-        elif cp["estado"] == EstadoCP.ACTIVADO:
+        elif cp["estado"] == EstadoCP.ACTIVADO.value:
             print(f"[INFO] El CP {cp_id} está Operativo. Comprobando disponibilidad...")
             msg["status"] = "aceptada"
 
@@ -189,7 +181,7 @@ class EV_Central:
         all_cps = self.db.load_charging_points()
         for_share_cp = [
             cp_id for cp_id, cp in all_cps.items()
-            if cp["estado"] == EstadoCP.ACTIVADO and cp["location"] == zone
+            if cp["estado"] == EstadoCP.ACTIVADO.value and cp["location"] == zone
         ]
 
         response = {
@@ -210,12 +202,12 @@ class EV_Central:
             print(f"[ERROR] Punto de carga {cp_id} no encontrado")
             return
 
-        if cp["estado"] == EstadoCP.PARADO:
+        if cp["estado"] == EstadoCP.PARADO.value:
             print(f"[INFO] Restableciendo {cp_id}")
         else:
             print(f"[INFO] Parando {cp_id}")
 
-        self.actualizar_estado(cp_id, EstadoCP.PARADO)
+        self.actualizar_estado(cp_id, EstadoCP.PARAD.value)
 
         zone = cp["location"]
         msg = {
@@ -254,7 +246,7 @@ class EV_Central:
             if zone:
                 self.kafka_handler.send_msg(data, self.topic(zone))
 
-        self._notificar_ui()
+        # self._notificar_ui()
 
     def finalizar_suministro(self, data, error=False):
         id = data.get("id")
@@ -340,10 +332,7 @@ if __name__ == "__main__":
         port = args.port
     )
 
-    ui = EV_Central_UI(gestor)
-
-    threading.Thread(target=gestor.check_timeouts, daemon=True).start()
     threading.Thread(target=gestor.socket_handler.start_listener, daemon=True).start()
     threading.Thread(target=gestor.kafka_handler.start_listener, daemon=True).start()
-
-    ui.run()
+    
+    gestor.check_timeouts()

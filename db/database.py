@@ -113,7 +113,7 @@ class DataBase:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, location, price, estado, driver, kwh, time, token 
-            FROM puntos_carga
+            FROM puntos_carga ORDER BY id
         """)
         rows = cursor.fetchall()
         conn.close()

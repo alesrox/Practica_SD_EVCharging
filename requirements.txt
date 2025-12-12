@@ -2,4 +2,5 @@ confluent-kafka==2.6.0
 fastapi
 uvicorn[standard]==0.23.2
 requests
+cryptography>=41.0.0
 httpx
