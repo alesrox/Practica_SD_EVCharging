@@ -6,7 +6,7 @@ from cryptography.hazmat.backends import default_backend
 # Debe coincidir con el generador
 MAGIC_SEPARATOR = b"||__SECRET_PAYLOAD__||"
 
-def obtener_secreto(ruta_cert: str, password=None) -> str:
+def obtener_secreto(ruta_cert: str, passwd=None) -> str:
     """
     Lee un archivo PEM Híbrido y extrae el secreto oculto al final.
     El password se ignora porque estos PEMs se generan sin contraseña (-nodes).
@@ -32,7 +32,7 @@ def obtener_secreto(ruta_cert: str, password=None) -> str:
     try:
         private_key = serialization.load_pem_private_key(
             pem_data,
-            password=None, 
+            password=passwd, 
             backend=default_backend()
         )
     except Exception as e:
