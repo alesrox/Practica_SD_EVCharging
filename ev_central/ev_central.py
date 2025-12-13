@@ -3,6 +3,7 @@ from typing import Dict
 import uuid
 import time
 import argparse
+import datetime
 import threading
 from cryptography.fernet import Fernet
 
@@ -29,16 +30,26 @@ class EV_Central:
         self.socket_handler = Socket_Handler(self, port=port)
         self.kafka_handler = Kafka_Handler(self, broker)
 
+    def log_auditoria(self, log, nombre_archivo="auditoria.log"):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        linea_registro = f"[{timestamp}] {log}\n"
+
+        with open(nombre_archivo, 'a', encoding='utf-8') as archivo:
+            archivo.write(linea_registro)
+
     def check_cp_events(self, cp):
+        cp_id = cp["id"]
         cond0 = cp["estado"] == EstadoCP.PARADO.value
-        cond1 = cp["id"] in self.paused_cps
+        cond1 = cp_id in self.paused_cps
 
         if cond0 and not cond1:
-            self.paused_cps.append(cp["id"])
-            self.toggle_pause_cp(cp["id"])
+            self.paused_cps.append(cp_id)
+            self.toggle_pause_cp(cp_id)
+            self.log_auditoria(f"CP {cp_id} pausado desde panel de control")
         elif not cond0 and cond1:
-            self.paused_cps.remove(cp["id"])
-            self.toggle_pause_cp(cp["id"])
+            self.paused_cps.remove(cp_id)
+            self.toggle_pause_cp(cp_id)
+            self.log_auditoria(f"CP {cp_id} reaunudado desde panel de control")
 
     def check_timeouts(self, timeout=5):
         while True:
@@ -49,6 +60,7 @@ class EV_Central:
                 self.check_cp_events(cp)
                 if now - last > timeout and cp["estado"] != EstadoCP.DESCONECTADO.value:
                     self.db.update_estado(cp_id, EstadoCP.DESCONECTADO.value)
+                    self.log_auditoria(f"Desconexión detectada en CP {cp_id}")
             
             time.sleep(1)
 
@@ -60,6 +72,7 @@ class EV_Central:
             key = Fernet.generate_key().decode("utf-8")
             db_cp["token"] = key
             self.db.save_charging_point(db_cp)
+            self.log_auditoria(f"Clave simetrica compartida con {id}")
             return key
         
         return None
@@ -72,8 +85,9 @@ class EV_Central:
         cp = self.db.get_charging_point(id)
         if cp is None: return
 
+        antiguo_estado = cp["estado"]
         cond_av = nuevo_estado == EstadoCP.AVERIADO.value
-        cond_su = cp["estado"] == EstadoCP.SUMINISTRANDO.value
+        cond_su = antiguo_estado == EstadoCP.SUMINISTRANDO.value
 
         if cond_av and cond_su:
             data = {
@@ -84,7 +98,7 @@ class EV_Central:
             }
             self.finalizar_suministro(data, True)
 
-        if cp["estado"] == EstadoCP.PARADO.value and not cond_av:
+        if antiguo_estado == EstadoCP.PARADO.value and not cond_av:
             self.last_msg[id] = time.time()
             return
 
@@ -97,6 +111,8 @@ class EV_Central:
             self.db.start_time(id, None)
 
         self.db.update_estado(cp["id"], nuevo_estado)
+        if antiguo_estado != nuevo_estado:
+            self.log_auditoria(f"CP {id} cambió de {antiguo_estado} a {nuevo_estado}")
         self.last_msg[id] = time.time()
 
     def topic(self, zone):
@@ -125,6 +141,7 @@ class EV_Central:
         self.kafka_handler.send_encrypted_msg(
             response, self.topic(zone), cp.get("token"), cp_id
         )
+        self.log_auditoria(f"Solicitud de suministro de {cp_id}: {status}")
 
     def procesar_solicitud_driver(self, data):
         id = data.get("id")
@@ -161,6 +178,7 @@ class EV_Central:
         else:
             print(f"[INFO] {cp_id} no disponible: Solicitud denegada ({id})")
 
+        self.log_auditoria(f"Driver {driver} solicitó recarga en {cp_id}: {msg['status']}")
         self.kafka_handler.send_msg(msg, self.topic(zone))
         self.kafka_handler.send_encrypted_msg(
             msg, self.topic(zone), cp.get("token"), cp_id
@@ -191,6 +209,7 @@ class EV_Central:
                 response, self.topic(cp["location"]), cp.get("token"), cp_id
             )
 
+        self.log_auditoria(f"CP {cp_id} comenzó a suministrar a {driver or 'N/A'}")
         self.kafka_handler.send_msg(response, self.topic(zone))
         self.kafka_handler.send_encrypted_msg(
             response, self.topic(zone), cp.get("token"), cp_id
@@ -219,6 +238,7 @@ class EV_Central:
         }
 
         print(f"[INFO] Enviando CPs disponibles a {driver} ({id})")
+        self.log_auditoria(f"CPs disponibles enviados a {driver}")
         self.kafka_handler.send_msg(response, self.topic(zone))
 
     def toggle_pause_cp(self, cp_id):
@@ -308,6 +328,7 @@ class EV_Central:
             }
 
             print(f"[INFO] Enviando ticket a {driver}")
+            self.log_auditoria(f"Ticket guardado del suministraje {id}")
             if zone:
                 self.kafka_handler.send_msg(ticket, self.topic(zone))
 
