@@ -39,6 +39,8 @@ class Engine:
         self._ticket_id = None
         self._last_ticket = None
 
+        self.ask_for_new_key = False
+
         _topic = location.replace(" ", "").lower()
         self.consumer_topic = f"{_topic}-central-response"
         self.producer_topic = f"{_topic}-central-request"
@@ -94,7 +96,12 @@ class Engine:
                     return
                 msg = json.loads(data.decode("utf-8"))
                 if msg.get("type") == "check" and msg.get("id") == self.id:
-                    if not self.ko_mode:
+                    if self.ask_for_new_key:
+                        client_socket.send(
+                            json.dumps({"type": "new keys", "id": self.id}).encode("utf-8")
+                        )
+                        self.ask_for_new_key = False
+                    elif not self.ko_mode:
                         self.monitor_response(client_socket)
                 elif msg.get("type") == "key" and msg.get("id") == self.id:
                     print("[INFO] Claves recibidas")
@@ -128,8 +135,7 @@ class Engine:
                             raise KafkaException(msg.error())
                         continue
                     try:
-                        data = json.loads(msg.value().decode("utf-8"))
-                        executor.submit(self._procesar_mensaje, data)
+                        executor.submit(self._procesar_mensaje, msg)
                     except Exception as e:
                         print(f"[KAFKA] Mensaje no válido recibido: {e}")
             except Exception as e:
@@ -137,8 +143,16 @@ class Engine:
             finally:
                 self.consumer.close()
 
-    def _procesar_mensaje(self, data):
-        if data.get("cp") == self.id and not self.ko_mode:
+    def decode_message(self, msg):
+        fernet = Fernet(self.token)
+        decrypted_bytes = fernet.decrypt(msg.value())
+        data = json.loads(decrypted_bytes.decode("utf-8"))
+        return data
+
+    def _procesar_mensaje(self, msg):
+        if msg.key().decode("utf-8") == self.id and not self.ko_mode:
+            data = self.decode_message(msg)
+
             t = data.get("type")
             if t == "engine_supply_response":
                 status = data.get('status')
@@ -320,6 +334,9 @@ def engine_ui(engine: Engine):
         on_button.pack(pady=(5, 10))
         off_button.pack_forget()
 
+    def reauth():
+        engine.ask_for_new_key = True
+
     engine.ui_off_btn = quitar_btn_off
 
     root = tk.Tk()
@@ -328,8 +345,11 @@ def engine_ui(engine: Engine):
     label_consumo = tk.Label(root, text="Consumo: 0.00 kWh | 0.00€", font=("Arial", 14, "bold"))
     label_consumo.pack(pady=5)
 
+    auth_btn = tk.Button(root, text="Re-Autenticarse", width=20, command=reauth)
+    auth_btn.pack(pady=(10, 5))
+
     ko_button = tk.Button(root, text="KO Mode: OFF", width=20, command=toggle_ko)
-    ko_button.pack(pady=(10, 5))
+    ko_button.pack(pady=5)
 
     supply_button = tk.Button(root, text="Solicitar Suministro", width=20, command=solicitar_suministro_ui)
     supply_button.pack(pady=5)
@@ -338,7 +358,6 @@ def engine_ui(engine: Engine):
     on_button.pack(pady=(5, 10))
 
     off_button = tk.Button(root, text="Desconectar", width=20, command=desconectar)
-
     root.mainloop()
 
 if __name__ == "__main__":

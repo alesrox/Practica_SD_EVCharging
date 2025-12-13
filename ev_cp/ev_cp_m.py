@@ -4,6 +4,9 @@ import socket
 import argparse
 import requests
 
+import warnings
+warnings.filterwarnings("ignore")
+
 class Monitor:
     def __init__(
         self, id: str,
@@ -52,8 +55,8 @@ class Monitor:
         except ConnectionRefusedError:
             print(f"[{self.id}] No se pudo conectar con central en {self.central_host}:{self.central_port}")
 
-    def _check_engine(self) -> str:
-        print("[INFO] Comprobando estado de Engine")
+    def _check_engine(self, verbose: bool = True) -> str:
+        if verbose: print("[INFO] Comprobando estado de Engine")
         mensaje = {"type": "check", "id": self.id}
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -69,18 +72,21 @@ class Monitor:
                             continue
                         response = json.loads(data.decode("utf-8"))
 
-                        if response.get("type") == "status" and response.get("id") == self.id:
+                        if response.get("type") == "new keys" and response.get("id") == self.id:
+                            self.auth_cp(init=False)
+                            return "OK"
+                        elif response.get("type") == "status" and response.get("id") == self.id:
                             self.location = response.get("location")
                             self.price = response.get("price")
 
-                            print("[INFO] Engine Status: OK")
+                            if verbose: print("[INFO] Engine Status: OK")
                             return response["status"]
                     except Exception:
                         continue
         except (ConnectionRefusedError, socket.timeout):
             pass
 
-        print("[INFO] Engine Status: KO")
+        if verbose: print("[INFO] Engine Status: KO")
         return "AVERIADO"
     
     def autenticar(self):
@@ -103,9 +109,12 @@ class Monitor:
                 clave_b64 = respuesta.get("key")
                 self.key = clave_b64
 
-    def auth_cp(self):
-        while self._check_engine() == "AVERIADO":
-            time.sleep(1)
+    def auth_cp(self, init: bool = True):
+        if init:
+            print(f"[INFO] Esperando a que el engine esté operativo...")
+            while self._check_engine(verbose = False) == "AVERIADO":
+                time.sleep(1)
+            print(f"[INFO] Engine operativo")
 
         url = self.registry + "/alta"
         payload = {
