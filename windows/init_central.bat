@@ -3,5 +3,7 @@ cd ..
 docker compose up -d --build
 pip install -r requirements.txt
 python topics.py
-start "BASE DE DATOS" cmd /k "uvicorn db.server:app --host 0.0.0.0 --port 9000 --reload"
+cls
+start "BASE DE DATOS" cmd /k "python3.11 db/server.py"
+start "API CENTRAL" cmd /k "python3.11 ev_central/api_central.py"
 python ev_central/ev_central.py --broker localhost:9092
