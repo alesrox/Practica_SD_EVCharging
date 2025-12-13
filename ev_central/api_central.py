@@ -19,6 +19,10 @@ DB = EVCentralAPI(DB_URL)
 def get_all_cps():
     return DB.load_charging_points()
 
+@app.get("/pause/{cp_id}")
+def get_all_cps(cp_id: str):
+    DB.update_estado(cp_id, "PARADO")
+
 # TODO: Añadir certificación
 if __name__ == "__main__":
     uvicorn.run(
