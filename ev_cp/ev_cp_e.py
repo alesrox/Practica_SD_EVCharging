@@ -128,8 +128,7 @@ class Engine:
                             raise KafkaException(msg.error())
                         continue
                     try:
-                        data = json.loads(msg.value().decode("utf-8"))
-                        executor.submit(self._procesar_mensaje, data)
+                        executor.submit(self._procesar_mensaje, msg)
                     except Exception as e:
                         print(f"[KAFKA] Mensaje no válido recibido: {e}")
             except Exception as e:
@@ -137,8 +136,16 @@ class Engine:
             finally:
                 self.consumer.close()
 
-    def _procesar_mensaje(self, data):
-        if data.get("cp") == self.id and not self.ko_mode:
+    def decode_message(self, msg):
+        fernet = Fernet(self.token)
+        decrypted_bytes = fernet.decrypt(msg.value())
+        data = json.loads(decrypted_bytes.decode("utf-8"))
+        return data
+
+    def _procesar_mensaje(self, msg):
+        if msg.key().decode("utf-8") == self.id and not self.ko_mode:
+            data = self.decode_message(msg)
+
             t = data.get("type")
             if t == "engine_supply_response":
                 status = data.get('status')

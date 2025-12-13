@@ -9,7 +9,6 @@ from cryptography.fernet import Fernet
 
 from db import EVCentralAPI
 from charging_point import EstadoCP
-from ev_central_gui import EV_Central_UI
 from kafka_handler import Kafka_Handler
 from socket_handler import Socket_Handler
 
@@ -109,7 +108,9 @@ class EV_Central:
         }
 
         print(f"[INFO] Solicitud {id}: {status}")
-        self.kafka_handler.send_msg(response, self.topic(zone))
+        self.kafka_handler.send_encrypted_msg(
+            response, self.topic(zone), cp.get("token"), cp_id
+        )
 
     def procesar_solicitud_driver(self, data):
         id = data.get("id")
@@ -140,11 +141,16 @@ class EV_Central:
             msg["status"] = "aceptada"
 
             if zone != cp["location"]:
-                self.kafka_handler.send_msg(msg, self.topic(cp["location"]))
+                self.kafka_handler.send_encrypted_msg(
+                    msg, self.topic(cp["location"]), cp.get("token"), cp_id
+                )
         else:
             print(f"[INFO] {cp_id} no disponible: Solicitud denegada ({id})")
 
         self.kafka_handler.send_msg(msg, self.topic(zone))
+        self.kafka_handler.send_encrypted_msg(
+            msg, self.topic(zone), cp.get("token"), cp_id
+        )
 
     def supply_response(self, data):
         id = data.get("id")
@@ -167,9 +173,14 @@ class EV_Central:
 
         cp = self.db.get_charging_point(cp_id)
         if zone != cp["location"]:
-            self.kafka_handler.send_msg(response, self.topic(cp["location"]))
+            self.kafka_handler.send_encrypted_msg(
+                response, self.topic(cp["location"]), cp.get("token"), cp_id
+            )
 
         self.kafka_handler.send_msg(response, self.topic(zone))
+        self.kafka_handler.send_encrypted_msg(
+            response, self.topic(zone), cp.get("token"), cp_id
+        )
 
     def share_cp(self, data):
         id = data.get("id")
@@ -196,30 +207,30 @@ class EV_Central:
         print(f"[INFO] Enviando CPs disponibles a {driver} ({id})")
         self.kafka_handler.send_msg(response, self.topic(zone))
 
-    def parar_cp(self, cp_id):
-        cp = self.db.get_charging_point(cp_id)
-        if cp is None:
-            print(f"[ERROR] Punto de carga {cp_id} no encontrado")
-            return
+    # def parar_cp(self, cp_id):
+    #     cp = self.db.get_charging_point(cp_id)
+    #     if cp is None:
+    #         print(f"[ERROR] Punto de carga {cp_id} no encontrado")
+    #         return
 
-        if cp["estado"] == EstadoCP.PARADO.value:
-            print(f"[INFO] Restableciendo {cp_id}")
-        else:
-            print(f"[INFO] Parando {cp_id}")
+    #     if cp["estado"] == EstadoCP.PARADO.value:
+    #         print(f"[INFO] Restableciendo {cp_id}")
+    #     else:
+    #         print(f"[INFO] Parando {cp_id}")
 
-        self.actualizar_estado(cp_id, EstadoCP.PARAD.value)
+    #     self.actualizar_estado(cp_id, EstadoCP.PARAD.value)
 
-        zone = cp["location"]
-        msg = {
-            "id": str(uuid.uuid4()),
-            "type": "start_stop_services",
-            "cp": cp_id,
-            "zone": zone,
-            "timestamp": time.time()
-        }
+    #     zone = cp["location"]
+    #     msg = {
+    #         "id": str(uuid.uuid4()),
+    #         "type": "start_stop_services",
+    #         "cp": cp_id,
+    #         "zone": zone,
+    #         "timestamp": time.time()
+    #     }
         
-        zone = zone.replace(" ", "").lower()
-        self.kafka_handler.send_msg(msg, self.topic(zone))
+    #     zone = zone.replace(" ", "").lower()
+    #     self.kafka_handler.send_msg(msg, self.topic(zone))
 
     def suministrando(self, data):
         cp_id = data.get("cp")
@@ -298,7 +309,9 @@ class EV_Central:
                 "timestamp": time.time()
             }
 
-            self.kafka_handler.send_msg(msg, self.topic(data.get("zone")))
+            self.kafka_handler.send_encrypted_msg(
+                msg, self.topic(data.get("zone")), cp.get("token"), cp_id
+            )
 
     def ticket_history(self, data):
         id = data.get("id")

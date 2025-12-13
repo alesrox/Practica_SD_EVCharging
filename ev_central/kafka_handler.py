@@ -100,4 +100,15 @@ class Kafka_Handler:
     def send_msg(self, msg, topic):
         self.producer.produce(topic, json.dumps(msg).encode("utf-8"))
         self.producer.flush(timeout=5)
-        # print(f"[KAFKA] Message sent ({msg['id']})")
+
+    def send_encrypted_msg(self, msg, topic, token, id):
+        fernet = Fernet(token)
+        msg_json = json.dumps(msg).encode("utf-8")
+        msg_encrypted = fernet.encrypt(msg_json)
+
+        self.producer.produce(
+            topic, 
+            key=id.encode("utf-8"),
+            value=msg_encrypted,
+        )
+        self.producer.flush(timeout=5)
