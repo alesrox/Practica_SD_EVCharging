@@ -1,0 +1,51 @@
+@echo off
+setlocal enabledelayedexpansion
+
+REM =========================================================
+REM                 CONFIGURACIÓN DE EJECUCIÓN
+REM =========================================================
+
+set PYTHON_CMD=python
+
+REM ===== 1. Cargar variable REGISTRY_IP desde .env =====
+echo.
+echo Cargando configuracion de .env...
+if not exist .env (
+    echo [ERROR] No se encontro el archivo .env.
+    pause
+    exit /b
+)
+
+set REGISTRY_IP=
+REM La expresion 'findstr' busca la linea que empieza con REGISTRY_IP=
+for /f "usebackq tokens=1,2 delims==" %%a in ('findstr /B "REGISTRY_IP=" .env') do (
+    set REGISTRY_IP=%%b
+)
+
+REM Validar si REGISTRY_IP fue cargado
+if "%REGISTRY_IP%"=="" (
+    echo [ERROR] No se encontro REGISTRY_IP en el archivo .env.
+    pause
+    exit /b
+)
+echo REGISTRY_IP cargado: %REGISTRY_IP%
+
+REM ===== 2. Instalar dependencias =====
+echo.
+echo Instalando dependencias...
+pip install -r requirements.txt
+cls
+
+REM ===== 3. Ejecutar el script principal =====
+echo.
+echo Iniciando EV Registry (ev_registry.py) en esta ventana...
+echo Usando Python: %PYTHON_CMD%
+echo.
+
+REM Ejecutar ev_registry.py. El script se mantendra abierto.
+%PYTHON_CMD% ev_registry/ev_registry.py
+
+REM El script se detendra cuando ev_registry.py termine/sea cerrado
+echo.
+echo El proceso ev_registry.py ha finalizado.
+pause
