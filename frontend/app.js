@@ -65,6 +65,14 @@ function getCardHTML(punto) {
 }
 
 function openMenu(id) {
+    const statusElement = document.querySelector(`#cp-card-${id} .cp-status`);
+    const estadoActual = statusElement ? statusElement.innerText.toUpperCase() : "";
+
+    if (estadoActual === 'DESCONECTADO' || estadoActual === 'AVERIADO') {
+        alert(`No se puede gestionar mientras esté ${estadoActual}.`);
+        return;
+    }
+
     currentSelectedCP = id;
     modalTitle.textContent = `Gestión del CP: ${id}`;
     
