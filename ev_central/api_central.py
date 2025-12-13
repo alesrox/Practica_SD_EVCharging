@@ -23,6 +23,10 @@ def get_all_cps():
 def get_all_cps(cp_id: str):
     DB.update_estado(cp_id, "PARADO")
 
+@app.get("/unpause/{cp_id}")
+def get_all_cps(cp_id: str):
+    DB.update_estado(cp_id, "DESCONECTADO")
+
 # TODO: Añadir certificación
 if __name__ == "__main__":
     uvicorn.run(

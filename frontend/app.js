@@ -57,6 +57,19 @@ function getCardHTML(punto) {
     return html;
 }
 
+async function pauseCP(id) {
+    const statusElement = document.querySelector(`#cp-card-${id} .cp-status`);
+    const estadoActual = statusElement ? statusElement.innerText.toUpperCase() : "";
+
+    let endpoint = (estadoActual === 'PARADO') ? 'unpause' : 'pause';
+    let mensaje = (estadoActual === 'PARADO') ? 'REANUDADO' : 'PAUSADO';
+
+    await fetch(`http://localhost:7500/${endpoint}/${id}`);
+    alert(`CP ${id} ha sido ${mensaje}.`); 
+
+    updateUI();
+}
+
 async function updateUI() {
     try {
         const response = await fetch(API_URL);
@@ -84,7 +97,7 @@ async function updateUI() {
                 cardElement.id = cardId;
                 cardElement.className = newClass;
                 cardElement.innerHTML = newHTML;
-                cardElement.onclick = () => alert(`Punto ID: ${punto.id}`);
+                cardElement.onclick = () => pauseCP(punto.id);
                 container.appendChild(cardElement);
             }
         });

@@ -23,23 +23,33 @@ class EV_Central:
         self.db = EVCentralAPI(DB_URL)
         self.db.reset_all_charging_points()
         self.last_msg: Dict[str, float] = {}
+        self.paused_cps = []
 
         self.tickets = []
 
         self.socket_handler = Socket_Handler(self, port=port)
         self.kafka_handler = Kafka_Handler(self, broker)
 
+    def check_paused_cps(self, cp):
+        cond0 = cp["estado"] == EstadoCP.PARADO.value
+        cond1 = cp["id"] in self.paused_cps
+        if cond0 and not cond1:
+            self.paused_cps.append(cp["id"])
+            self.toggle_pause_cp(cp["id"])
+        elif not cond0 and cond1:
+            self.paused_cps.remove(cp["id"])
+            self.toggle_pause_cp(cp["id"])
+
     def check_timeouts(self, timeout=5):
         while True:
             now = time.time()
             for cp_id, last in self.last_msg.items():
-                if now - last > timeout:
-                    cp = self.db.get_charging_point(cp_id)
-                    if cp is None:
-                        continue
-                    
-                    if cp["estado"] != EstadoCP.DESCONECTADO.value:
-                        self.db.update_estado(cp_id, EstadoCP.DESCONECTADO.value)
+                cp = self.db.get_charging_point(cp_id)
+                if cp is None: continue
+                self.check_paused_cps(cp)
+                if now - last > timeout and cp["estado"] != EstadoCP.DESCONECTADO.value:
+                    self.db.update_estado(cp_id, EstadoCP.DESCONECTADO.value)
+            
             time.sleep(1)
 
     def autenticar_cp(self, id: str, token: str) -> bool:
@@ -74,6 +84,10 @@ class EV_Central:
             }
             self.finalizar_suministro(data, True)
 
+        if cp["estado"] == EstadoCP.PARADO.value and not cond_av:
+            self.last_msg[id] = time.time()
+            return
+
         cond_init_su = nuevo_estado == EstadoCP.SUMINISTRANDO.value and not cp["time"]
         if cond_init_su:
             cp["time"] = time.time()
@@ -83,7 +97,7 @@ class EV_Central:
             self.db.start_time(id, None)
 
         self.db.update_estado(cp["id"], nuevo_estado)
-        gestor.last_msg[id] = time.time()
+        self.last_msg[id] = time.time()
 
     def topic(self, zone):
         _zone = zone.replace(" ", "").lower()
@@ -207,30 +221,28 @@ class EV_Central:
         print(f"[INFO] Enviando CPs disponibles a {driver} ({id})")
         self.kafka_handler.send_msg(response, self.topic(zone))
 
-    # def parar_cp(self, cp_id):
-    #     cp = self.db.get_charging_point(cp_id)
-    #     if cp is None:
-    #         print(f"[ERROR] Punto de carga {cp_id} no encontrado")
-    #         return
+    def toggle_pause_cp(self, cp_id):
+        cp = self.db.get_charging_point(cp_id)
 
-    #     if cp["estado"] == EstadoCP.PARADO.value:
-    #         print(f"[INFO] Restableciendo {cp_id}")
-    #     else:
-    #         print(f"[INFO] Parando {cp_id}")
+        # El estado ya habido sido actualizado antes
+        if cp["estado"] == EstadoCP.PARADO.value:
+            print(f"[INFO] Parando {cp_id}")
+        else:
+            print(f"[INFO] Restableciendo {cp_id}")
 
-    #     self.actualizar_estado(cp_id, EstadoCP.PARAD.value)
-
-    #     zone = cp["location"]
-    #     msg = {
-    #         "id": str(uuid.uuid4()),
-    #         "type": "start_stop_services",
-    #         "cp": cp_id,
-    #         "zone": zone,
-    #         "timestamp": time.time()
-    #     }
+        zone = cp["location"]
+        msg = {
+            "id": str(uuid.uuid4()),
+            "type": "start_stop_services",
+            "cp": cp_id,
+            "zone": zone,
+            "timestamp": time.time()
+        }
         
-    #     zone = zone.replace(" ", "").lower()
-    #     self.kafka_handler.send_msg(msg, self.topic(zone))
+        zone = zone.replace(" ", "").lower()
+        self.kafka_handler.send_encrypted_msg(
+            msg, self.topic(zone), cp.get("token"), cp_id
+        )
 
     def suministrando(self, data):
         cp_id = data.get("cp")
