@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
-from db.database import DataBase
+from typing import Optional
+from database import DataBase
+import uvicorn
 
 app = FastAPI()
 db = DataBase()
@@ -106,3 +107,11 @@ def tickets_by_driver(driver_id: str):
         { "fecha": t[0], "punto_carga": t[1], "total": t[2] }
         for t in tickets
     ]
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "server:app", 
+        host="0.0.0.0", 
+        port=9000, 
+        reload=True,
+    )

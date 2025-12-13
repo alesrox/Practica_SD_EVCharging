@@ -29,7 +29,8 @@ EOF
 }
 
 # Ejecutar ev_central con el broker
-run_in_new_terminal "uvicorn db.server:app --host 0.0.0.0 --port 9000 --reload"
+# run_in_new_terminal "uvicorn db.server:app --host 0.0.0.0 --port 9000 --reload"
+run_in_new_terminal "python3.11 db/server.py"
 run_in_new_terminal "python3.11 ev_central/api_central.py"
 
 echo "Esperando a que el servidor FastAPI esté listo..."

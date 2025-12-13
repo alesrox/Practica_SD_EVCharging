@@ -1,7 +1,7 @@
 import sqlite3
 from typing import Dict, Optional
 from datetime import datetime
-from db.charging_point import EstadoCP   
+from charging_point import EstadoCP   
 
 DB_PATH = "EV_DATABASE.db"
 
