@@ -39,6 +39,10 @@ ciudades_cp: Dict[str, str] = {}
 weather_cache: Dict[str, dict] = {} # Ajustado type hint
 CACHE_DURATION = timedelta(minutes=1)
 
+# NOMBRE DEL CERTIFICADO
+NOMBRE_CERTIFICADO = "certServ.pem"
+RUTA_CERTIFICADO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", NOMBRE_CERTIFICADO))
+
 # --- Backend Asíncrono ---
 
 async def obtener_grados(ciudad: str, api_key: str, api_url: str) -> Optional[float]:
@@ -63,8 +67,47 @@ async def obtener_grados(ciudad: str, api_key: str, api_url: str) -> Optional[fl
         except Exception:
             return None
 
+# --- 4. COMUNICACIÓN CON API CENTRAL (Segura / Interna) ---
 async def notificar_central(ciudad: str, temp: float, central_ip: str, gui_app=None):
-    pass
+    # A. Buscamos qué CPs están en esa ciudad
+    cps_afectados = []
+    with data_lock:
+        for cp_id, ciudad_cp in ciudades_cp.items():
+            if ciudad_cp.lower() == ciudad.lower():
+                cps_afectados.append(cp_id)
+
+    if not cps_afectados:
+        return
+
+    # B. Configuración de la conexión segura
+    url_central = f"https://{central_ip}:7500/api/weather-alert"
+
+    # C. Enviamos la alerta
+    # verify=RUTA_CERTIFICADO asegura que hablamos con NUESTRA Central
+    async with httpx.AsyncClient(verify=RUTA_CERTIFICADO) as client:
+        for cp in cps_afectados:
+            payload = {
+                "cp_id": cp,
+                "temp": temp,
+                "ciudad": ciudad
+            }
+            try:
+                await client.post(url_central, json=payload)
+                
+                if gui_app:
+                    estado = "ALERTA" if temp < 0 else "OK"
+                    gui_app.agregar_log(f"Enviado {cp}: {temp}ºC -> {estado}", "info")
+            
+            # --- CORRECCIÓN DE EXCEPCIONES ---
+            except httpx.ConnectTimeout:
+                if gui_app: gui_app.agregar_log(f"Timeout: La Central ({central_ip}) no responde.", "error")
+            except httpx.ConnectError:
+                if gui_app: gui_app.agregar_log(f"Error Conexión: ¿Está encendida la Central?", "error")
+            except httpx.RequestError as e:
+                # Esto captura errores SSL y otros errores de red genéricos
+                if gui_app: gui_app.agregar_log(f"Error Red/SSL: {e}", "alerta")
+            except Exception as e:
+                if gui_app: gui_app.agregar_log(f"Error desconocido: {e}", "error")
 
 # --- BUCLE PRINCIPAL ASÍNCRONO --- (Consulta clima y notifica cada 4 segundos)
 async def bucle_clima(env_vars: Dict[str, str], gui_app):
