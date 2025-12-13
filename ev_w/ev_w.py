@@ -38,7 +38,7 @@ RUTA_CA = os.path.abspath(os.path.join(
 
 # Si no está ahí, buscamos en la raíz por si acaso
 if not os.path.exists(RUTA_CA):
-    RUTA_CA = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", NOMBRE_CA))
+    print(f"AVISO: No encuentro CA en {RUTA_CA}, buscando en carpeta raíz...")
 
 
 # --- DATOS COMPARTIDOS ---
@@ -112,7 +112,7 @@ async def bucle_actualizar_estados(central_ip: str, gui_app=None):
     
     # 3. Aviso visual si falta el cert CA
     if not os.path.exists(RUTA_CA):
-        if gui_app: gui_app.agregar_log(f"⚠️ ERROR: No encuentro CA en {RUTA_CA}", "error")
+        if gui_app: gui_app.agregar_log(f"ERROR: No encuentro CA en {RUTA_CA}", "error")
 
     if gui_app: gui_app.agregar_log(f"🔄 Sincronizando (HTTPS) con {url}...", "sistema")
 
@@ -185,9 +185,9 @@ async def notificar_central(ciudad: str, temp: float, central_ip: str, gui_app=N
                         with data_lock: estados_cps_cache[cp] = "PARADO"
 
                 except httpx.ssl.SSLError as e:
-                    if gui_app: gui_app.agregar_log(f"🔒 Error SSL Pause: {e}", "error")
+                    if gui_app: gui_app.agregar_log(f"Error SSL Pause: {e}", "error")
                 except Exception as e:
-                    if gui_app: gui_app.agregar_log(f"❌ Error al pausar {cp}: {e}", "error")
+                    if gui_app: gui_app.agregar_log(f"Error al pausar {cp}: {e}", "error")
 
 # --- BUCLE CLIMA ---
 async def bucle_clima(env_vars: Dict[str, str], gui_app):
@@ -271,7 +271,7 @@ def get_env():
         
         # Fallback a localhost si falla el .env (para evitar ConnectError directo)
         if not ip: 
-            print("⚠️ AVISO: No IP en .env, saliendo...")
+            print("AVISO: No IP en .env, saliendo...")
             exit(1)
 
         env_vars['CENTRAL_IP'] = ip
