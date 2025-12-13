@@ -7,6 +7,8 @@ import requests
 import warnings
 warnings.filterwarnings("ignore")
 
+CA_CERT_PATH = "certs/registry/certificado_CA.crt"
+
 class Monitor:
     def __init__(
         self, id: str,
@@ -123,7 +125,8 @@ class Monitor:
             "price": self.price
         }
         try:
-            res = requests.put(url, json=payload, verify=False, timeout=5)
+            # res = requests.put(url, json=payload, verify=False, timeout=5)
+            res = requests.put(url, json=payload, verify=CA_CERT_PATH, timeout=5)
             res.raise_for_status()
             data = res.json()
             if "token" in data:

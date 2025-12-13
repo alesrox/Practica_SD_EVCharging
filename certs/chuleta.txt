@@ -1,0 +1,14 @@
+openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout clave_privada_CA.pem -out certificado_CA.crt
+
+openssl req -new -newkey rsa:2048 -nodes -keyout clave_privada_servidor.pem -out solicitud_servidor.csr -config san_config.ext -subj "/C=ES/CN=API-Servidor-FastAPI"
+
+openssl x509 -req -in solicitud_servidor.csr -CA certificado_CA.crt -CAkey clave_privada_CA.pem -CAcreateserial -out certificado_servidor.crt -days 365 -extfile san_config.ext -extensions v3_req
+
+
+En Windows:
+    1. Haz doble clic en el archivo certificado_CA.crt.
+    2. Haz clic en "Instalar certificado...".
+    3. Selecciona "Máquina Local" y haz clic en Siguiente.
+    4. Selecciona "Colocar todos los certificados en el siguiente almacén" y haz clic en "Examinar...".
+    5. Elige "Entidades de certificación raíz de confianza".
+    6. Finaliza el proceso.

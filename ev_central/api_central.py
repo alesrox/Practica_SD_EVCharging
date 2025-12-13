@@ -39,4 +39,6 @@ if __name__ == "__main__":
         host="0.0.0.0", 
         port=7500, 
         reload=True,
+        ssl_keyfile="certs/api-central/clave_privada_servidor.pem",
+        ssl_certfile="certs/api-central/certificado_servidor.crt"
     )
