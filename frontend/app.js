@@ -9,6 +9,13 @@ const appPlaceholder = document.getElementById('app-placeholder');
 const lastUpdatedSpan = document.getElementById('last-updated');
 const connectionStatusSpan = document.getElementById('connection-status');
 
+const modal = document.getElementById('action-modal');
+const modalTitle = document.getElementById('modal-title');
+const btnRevoke = document.getElementById('btn-revoke');
+const btnPause = document.getElementById('btn-pause');
+
+let currentSelectedCP = null;
+
 function getDateParts(timestamp) {
     if (!timestamp) return { date: '-', time: '-' };
     const dateObj = new Date(timestamp * 1000);
@@ -57,12 +64,47 @@ function getCardHTML(punto) {
     return html;
 }
 
+function openMenu(id) {
+    currentSelectedCP = id;
+    modalTitle.textContent = `Gestión del CP: ${id}`;
+    
+    btnRevoke.onclick = () => {
+        revokeKey(currentSelectedCP);
+        closeMenu();
+    };
+
+    btnPause.onclick = () => {
+        pauseCP(currentSelectedCP);
+        closeMenu();
+    };
+
+    modal.style.display = 'flex';
+}
+
+function closeMenu() {
+    modal.style.display = 'none';
+    currentSelectedCP = null;
+}
+
+window.onclick = function(event) {
+    if (event.target == modal) {
+        closeMenu();
+    }
+}
+
+async function revokeKey(id) {
+    await fetch(`http://localhost:7500/revoke/${id}`);
+    alert(`La clave del CP ${id} ha sido revocada exitosamente.`);
+}
+
 async function pauseCP(id) {
     const statusElement = document.querySelector(`#cp-card-${id} .cp-status`);
     const estadoActual = statusElement ? statusElement.innerText.toUpperCase() : "";
 
     let endpoint = (estadoActual === 'PARADO') ? 'unpause' : 'pause';
     let mensaje = (estadoActual === 'PARADO') ? 'REANUDADO' : 'PAUSADO';
+
+    btnPause.textContent = (estadoActual === 'PARADO') ? 'Pausar CP' : 'Reanudar CP';
 
     await fetch(`http://localhost:7500/${endpoint}/${id}`);
     alert(`CP ${id} ha sido ${mensaje}.`); 
@@ -97,7 +139,7 @@ async function updateUI() {
                 cardElement.id = cardId;
                 cardElement.className = newClass;
                 cardElement.innerHTML = newHTML;
-                cardElement.onclick = () => pauseCP(punto.id);
+                cardElement.onclick = () => openMenu(punto.id);
                 container.appendChild(cardElement);
             }
         });

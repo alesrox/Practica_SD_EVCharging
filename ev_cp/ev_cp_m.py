@@ -4,6 +4,9 @@ import socket
 import argparse
 import requests
 
+import warnings
+warnings.filterwarnings("ignore")
+
 class Monitor:
     def __init__(
         self, id: str,
@@ -69,7 +72,10 @@ class Monitor:
                             continue
                         response = json.loads(data.decode("utf-8"))
 
-                        if response.get("type") == "status" and response.get("id") == self.id:
+                        if response.get("type") == "new keys" and response.get("id") == self.id:
+                            self.auth_cp(init=False)
+                            return "OK"
+                        elif response.get("type") == "status" and response.get("id") == self.id:
                             self.location = response.get("location")
                             self.price = response.get("price")
 
@@ -103,11 +109,12 @@ class Monitor:
                 clave_b64 = respuesta.get("key")
                 self.key = clave_b64
 
-    def auth_cp(self):
-        print(f"[INFO] Esperando a que el engine esté operativo...")
-        while self._check_engine(verbose = False) == "AVERIADO":
-            time.sleep(1)
-        print(f"[INFO] Engine operativo")
+    def auth_cp(self, init: bool = True):
+        if init:
+            print(f"[INFO] Esperando a que el engine esté operativo...")
+            while self._check_engine(verbose = False) == "AVERIADO":
+                time.sleep(1)
+            print(f"[INFO] Engine operativo")
 
         url = self.registry + "/alta"
         payload = {

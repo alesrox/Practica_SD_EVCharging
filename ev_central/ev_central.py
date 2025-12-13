@@ -1,6 +1,5 @@
 from typing import Dict
 
-import os
 import uuid
 import time
 import argparse
@@ -30,9 +29,10 @@ class EV_Central:
         self.socket_handler = Socket_Handler(self, port=port)
         self.kafka_handler = Kafka_Handler(self, broker)
 
-    def check_paused_cps(self, cp):
+    def check_cp_events(self, cp):
         cond0 = cp["estado"] == EstadoCP.PARADO.value
         cond1 = cp["id"] in self.paused_cps
+
         if cond0 and not cond1:
             self.paused_cps.append(cp["id"])
             self.toggle_pause_cp(cp["id"])
@@ -46,7 +46,7 @@ class EV_Central:
             for cp_id, last in self.last_msg.items():
                 cp = self.db.get_charging_point(cp_id)
                 if cp is None: continue
-                self.check_paused_cps(cp)
+                self.check_cp_events(cp)
                 if now - last > timeout and cp["estado"] != EstadoCP.DESCONECTADO.value:
                     self.db.update_estado(cp_id, EstadoCP.DESCONECTADO.value)
             

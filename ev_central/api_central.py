@@ -1,6 +1,5 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
 import uvicorn
 
 from db import EVCentralAPI
@@ -20,12 +19,18 @@ def get_all_cps():
     return DB.load_charging_points()
 
 @app.get("/pause/{cp_id}")
-def get_all_cps(cp_id: str):
+def pause_cp(cp_id: str):
     DB.update_estado(cp_id, "PARADO")
 
 @app.get("/unpause/{cp_id}")
-def get_all_cps(cp_id: str):
+def unpause_cp(cp_id: str):
     DB.update_estado(cp_id, "DESCONECTADO")
+
+@app.get("/revoke/{cp_id}")
+def revoke_cp(cp_id: str):
+    cp = DB.get_charging_point(cp_id)
+    cp["token"] = None
+    DB.save_charging_point(cp)
 
 # TODO: Añadir certificación
 if __name__ == "__main__":
@@ -33,5 +38,5 @@ if __name__ == "__main__":
         "api_central:app", 
         host="0.0.0.0", 
         port=7500, 
-        reload=True
+        reload=True,
     )
