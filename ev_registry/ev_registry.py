@@ -88,7 +88,7 @@ if __name__ == "__main__":
         host="0.0.0.0", 
         port=8000, 
         reload=True,
-        ssl_keyfile="certServ.pem",
-        ssl_certfile="certServ.pem"
+        ssl_keyfile="certs/registry/clave_privada_servidor.pem",
+        ssl_certfile="certs/registry/certificado_servidor.crt"
     )
 

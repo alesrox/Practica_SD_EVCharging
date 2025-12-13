@@ -1,0 +1,10 @@
+docs
+docs/*
+
+*.db
+
+*.log
+
+.DS_Store
+
+__pycache__
