@@ -58,7 +58,8 @@ class Driver:
                         data = json.loads(msg.value().decode("utf-8"))
                         executor.submit(self._procesar_driver_msg, data)
                     except Exception as e:
-                        print(f"[KAFKA] Mensaje no válido recibido: {e}")
+                        pass
+                        # print(f"[KAFKA] Mensaje no válido recibido: {e}")
             except Exception as e:
                 print(f"[KAFKA] Error en el consumidor Kafka: {e}")
             finally:

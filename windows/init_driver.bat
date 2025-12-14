@@ -24,7 +24,6 @@ set /p ID=Introduce el ID (por ejemplo DRI1):
 if "%ID%"=="" set ID=DRI1
 
 set /p FILE=Introduce el nombre del archivo (por ejemplo data.json): 
-if "%FILE%"=="" set FILE=data.json
 
 REM ===== Ejecutar los scripts en ventanas separadas =====
 if not "%FILE%"=="" (

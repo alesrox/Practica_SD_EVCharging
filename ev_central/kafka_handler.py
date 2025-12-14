@@ -58,12 +58,17 @@ class Kafka_Handler:
                             raise KafkaException(msg.error())
                         continue
                     try:
-                        fernet = Fernet(
-                            self.gestor.get_key(msg.key().decode("utf-8"))
-                        )
+                        data = None
+                        if msg.key():
+                            fernet = Fernet(
+                                self.gestor.get_key(msg.key().decode("utf-8"))
+                            )
 
-                        decrypted_bytes = fernet.decrypt(msg.value())
-                        data = json.loads(decrypted_bytes.decode("utf-8"))
+                            decrypted_bytes = fernet.decrypt(msg.value())
+                            data = json.loads(decrypted_bytes.decode("utf-8"))
+                        else:
+                            data = json.loads(msg.value().decode("utf-8"))
+
                         executor.submit(self.procesar_msg, data)
                     except Exception as e:
                         print(f"[KAFKA] Mensaje no válido recibido: {e}")
