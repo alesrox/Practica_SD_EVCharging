@@ -26,6 +26,10 @@ DB = EVCentralAPI(DB_URL)
 def get_all_cps():
     return DB.load_charging_points()
 
+@app.get("/charging_point/{cp_id}")
+def get_cp(cp_id: str):
+    return DB.get_charging_point(cp_id)
+
 @app.get("/pause/{cp_id}")
 def pause_cp(cp_id: str):
     DB.update_estado(cp_id, "PARADO")
