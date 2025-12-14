@@ -94,7 +94,7 @@ class Monitor:
     def autenticar(self):
         mensaje = {"type": "auth", "id": self.id, "token": self.token}
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(2)
+            s.settimeout(15)
             s.connect((self.central_host, self.central_port))
             s.send(json.dumps(mensaje).encode("utf-8"))
             data = s.recv(4096) 

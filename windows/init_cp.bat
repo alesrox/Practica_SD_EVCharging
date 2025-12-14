@@ -1,4 +1,5 @@
 @echo off
+cd ..
 setlocal enabledelayedexpansion
 
 REM =========================================================
@@ -6,8 +7,8 @@ REM                 CONFIGURACIÓN DE EJECUCIÓN
 REM =========================================================
 
 set PYTHON_CMD=python
-set CP_M_TITLE="EV_CP_M (Engine)"
-set CP_E_TITLE="EV_CP_E (Broker Listener)"
+set CP_M_TITLE="EV_CP_M_Engine"
+set CP_E_TITLE="EV_CP_E_Broker Listener"
 
 REM ===== 1. Cargar variable CENTRAL_IP desde .env =====
 echo.
