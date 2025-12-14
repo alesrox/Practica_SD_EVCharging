@@ -12,9 +12,9 @@ CA_CERT_PATH = "certs/registry/certificado_CA.crt"
 class Monitor:
     def __init__(
         self, id: str,
-        central="localhost:6000",
-        engine="localhost:6001",
-        registry="localhost:8000",
+        central="127.0.0.1:6000",
+        engine="127.0.0.1:6001",
+        registry="127.0.0.1:8000",
     ):
         self.id = id
         self.location = None
@@ -168,9 +168,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("id", help="ID del Charging Point")
-    parser.add_argument("--central", default="localhost:6000", help="IP de la central")
-    parser.add_argument("--engine", default="localhost:6001", help="IP del engine")
-    parser.add_argument("--registry", default="localhost:8000", help="IP del registry")
+    parser.add_argument("--central", default="127.0.0.1:6000", help="IP de la central")
+    parser.add_argument("--engine", default="127.0.0.1:6001", help="IP del engine")
+    parser.add_argument("--registry", default="127.0.0.1:8000", help="IP del registry")
 
     args = parser.parse_args()
 

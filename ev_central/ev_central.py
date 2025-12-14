@@ -12,12 +12,12 @@ from charging_point import EstadoCP
 from kafka_handler import Kafka_Handler
 from socket_handler import Socket_Handler
 
-DB_URL = "http://localhost:9000"
+DB_URL = "http://127.0.0.1:9000"
 
 class EV_Central:
     def __init__(
         self, 
-        broker: str = "localhost:9092", 
+        broker: str = "127.0.0.1:9092", 
         port: int = 6000,
     ):
         self.db = EVCentralAPI(DB_URL)
@@ -369,7 +369,7 @@ class EV_Central:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_CENTRAL")
-    parser.add_argument("--broker", default="localhost:9092", help="Dirección del broker")
+    parser.add_argument("--broker", default="127.0.0.1:9092", help="Dirección del broker")
     parser.add_argument("--port", type=int, default=6000, help="Puerto de escucha")
     args = parser.parse_args()
 

@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 
 class Driver:
-    def __init__(self, id: str, location="Zone 0", broker="localhost:9092", filename=None):
+    def __init__(self, id: str, location="Zone 0", broker="127.0.0.1:9092", filename=None):
         self.id = id
         self.broker = broker
         self.filename = filename
@@ -260,7 +260,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EV_DRIVER")
     parser.add_argument("id", help="ID del Driver")
     parser.add_argument("--location", default="Zone 0", help="Ubicación")
-    parser.add_argument("--broker", default="localhost:9092", help="IP del broker")
+    parser.add_argument("--broker", default="127.0.0.1:9092", help="IP del broker")
     parser.add_argument("--file", default=None, help="Fichero de operaciones")
     args = parser.parse_args()
 

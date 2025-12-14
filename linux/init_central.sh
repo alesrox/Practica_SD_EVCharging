@@ -34,8 +34,8 @@ run_in_new_terminal "python3.11 db/server.py"
 run_in_new_terminal "python3.11 ev_central/api_central.py"
 
 echo "Esperando a que el servidor FastAPI esté listo..."
-while ! curl -s http://localhost:9000/charging_points > /dev/null; do
+while ! curl -s http://127.0.0.1:9000/charging_points > /dev/null; do
     sleep 0.5
 done
 
-python3.11 ev_central/ev_central.py --broker localhost:9092
+python3.11 ev_central/ev_central.py --broker 127.0.0.1:9092

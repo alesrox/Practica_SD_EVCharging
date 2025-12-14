@@ -27,23 +27,4 @@ clear
 read -p "Introduce el ID (por ejemplo DRI1) [DRI1]: " ID
 ID=${ID:-DRI1}
 
-# ===== Pedir FILE =====
-read -p "Introduce el nombre del archivo (por ejemplo data.json) [data.json]: " FILE
-FILE=${FILE:-data.json}
-
-
-echo
-echo "Usando configuración:"
-echo "  ID: $ID"
-echo "  FILE: $FILE"
-echo "  CENTRAL_IP: $CENTRAL_IP"
-echo
-
-# ===== Ejecutar el script driver =====
-if [ -n "$FILE" ]; then
-    echo "Iniciando ev_driver.py con archivo en nueva ventana..."
-    python3.11 ev_driver/ev_driver.py $ID --broker $CENTRAL_IP:9092 --file $FILE
-else
-    echo "Iniciando ev_driver.py sin archivo en nueva ventana..."
-    python3.11 ev_driver/ev_driver.py $ID --broker $CENTRAL_IP:9092
-fi
+python3.11 ev_driver/ev_driver.py $ID --broker $CENTRAL_IP:9092

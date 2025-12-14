@@ -2,7 +2,7 @@ import time
 from confluent_kafka.admin import AdminClient, NewTopic
 
 # Ajusta la dirección del broker según tu Docker Compose
-BROKER = 'localhost:9092'
+BROKER = '127.0.0.1:9092'
 
 # Esperar a que Kafka esté disponible
 while True:

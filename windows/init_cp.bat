@@ -58,7 +58,7 @@ REM ===== 4. Ejecutar scripts en ventanas separadas/actual =====
 REM Ejecutar ev_cp_m.py en una nueva ventana con todos los parametros
 echo.
 echo Iniciando ev_cp_m.py en una nueva ventana...
-start "%CP_M_TITLE%" cmd /k "!PYTHON_CMD! ev_cp\ev_cp_m.py !ID! --central !CENTRAL_IP!:6000 --engine localhost:!PORT! --registry !CENTRAL_IP!:8000"
+start "%CP_M_TITLE%" cmd /k "!PYTHON_CMD! ev_cp\ev_cp_m.py !ID! --central !CENTRAL_IP!:6000 --engine 127.0.0.1:!PORT! --registry !CENTRAL_IP!:8000"
 
 REM Ejecutar ev_cp_e.py en la ventana actual (como hace el SH por defecto)
 echo.

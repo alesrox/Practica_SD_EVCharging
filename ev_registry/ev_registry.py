@@ -12,7 +12,7 @@ app = FastAPI(title="EV_Registry")
 # -----------------------------
 # Configuración BD
 # -----------------------------
-BD_IP = "localhost" if len(sys.argv) != 2 else sys.argv[1]
+BD_IP = "127.0.0.1" if len(sys.argv) != 2 else sys.argv[1]
 BD_URL = f"http://{BD_IP}:9000"
 
 # -----------------------------

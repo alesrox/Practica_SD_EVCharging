@@ -1,4 +1,4 @@
-const API_URL = 'https://localhost:7500/charging_points';
+const API_URL = 'https://127.0.0.1:7500/charging_points';
 const REFRESH_INTERVAL = 2000; 
 
 const container = document.getElementById('cp-container');
@@ -101,7 +101,7 @@ window.onclick = function(event) {
 }
 
 async function revokeKey(id) {
-    await fetch(`https://localhost:7500/revoke/${id}`);
+    await fetch(`https://127.0.0.1:7500/revoke/${id}`);
     alert(`La clave del CP ${id} ha sido revocada exitosamente.`);
 }
 
@@ -114,7 +114,7 @@ async function pauseCP(id) {
 
     btnPause.textContent = (estadoActual === 'PARADO') ? 'Pausar CP' : 'Reanudar CP';
 
-    await fetch(`https://localhost:7500/${endpoint}/${id}`);
+    await fetch(`https://127.0.0.1:7500/${endpoint}/${id}`);
     alert(`CP ${id} ha sido ${mensaje}.`); 
 
     updateUI();

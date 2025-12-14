@@ -56,7 +56,7 @@ EOF
 }
 
 echo "Iniciando ev_cp_m.py en una nueva ventana..."
-run_in_new_terminal "python3.11 ev_cp/ev_cp_m.py $ID --central $CENTRAL_IP:6000 --engine localhost:$PORT --registry $CENTRAL_IP:8000"
+run_in_new_terminal "python3.11 ev_cp/ev_cp_m.py $ID --central $CENTRAL_IP:6000 --engine 127.0.0.1:$PORT --registry $CENTRAL_IP:8000"
 
 echo "Iniciando ev_cp_e.py..."
 python3.11 ev_cp/ev_cp_e.py $ID --broker $CENTRAL_IP:9092 --port $PORT

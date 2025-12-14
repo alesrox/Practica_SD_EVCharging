@@ -17,7 +17,7 @@ app.add_middleware(
 # -----------------------------
 # Configuración BD
 # -----------------------------
-DB_IP = "localhost" # if len(sys.argv) != 2 else sys.argv[1]
+DB_IP = "127.0.0.1" # if len(sys.argv) != 2 else sys.argv[1]
 DB_URL = f"http://{DB_IP}:9000"
 
 DB = EVCentralAPI(DB_URL)

@@ -1,7 +1,7 @@
 import requests
 
 # URL de la Base de Datos (Puerto 9000, según tu server.py)
-DB_URL = "http://localhost:9000/charging_point/save"
+DB_URL = "http://127.0.0.1:9000/charging_point/save"
 
 # Datos adaptados a tu CREATE TABLE
 payload = {

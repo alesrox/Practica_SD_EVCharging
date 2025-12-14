@@ -2,7 +2,7 @@ import requests
 from typing import Dict, Any, Optional
 
 class EVCentralAPI:
-    def __init__(self, server_url: str = "http://localhost:9000"):
+    def __init__(self, server_url: str = "http://127.0.0.1:9000"):
         self.server_url = server_url.rstrip("/")
 
     # --- Charging points ---

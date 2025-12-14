@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 
 class Kafka_Handler:
-    def __init__(self, gestor, broker="localhost:9092"):
+    def __init__(self, gestor, broker="127.0.0.1:9092"):
         self.gestor = gestor
         self.broker = broker
         self.topics = [

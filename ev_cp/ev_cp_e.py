@@ -15,7 +15,7 @@ from confluent_kafka import Producer, Consumer, KafkaError, KafkaException
 class Engine:
     def __init__(
         self, id: str, location: str = "Zone 0", price: float = 0.6,
-        broker: str = "localhost:9092", port: int = 6001,
+        broker: str = "127.0.0.1:9092", port: int = 6001,
     ):
         self.id = id
         self.location = location
@@ -365,7 +365,7 @@ if __name__ == "__main__":
     parser.add_argument("id", help="ID del Charging Point")
     parser.add_argument("--location", default="Zone 0", help="Ubicación del CP")
     parser.add_argument("--price", type=float, default=0.6, help="Precio del kWh del CP")
-    parser.add_argument("--broker", default="localhost:9092", help="IP de la central")
+    parser.add_argument("--broker", default="127.0.0.1:9092", help="IP de la central")
     parser.add_argument("--port", type=int, default=6001, help="Puerto de escucha del Engine")
     args = parser.parse_args()
 
