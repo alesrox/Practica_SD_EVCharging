@@ -68,7 +68,10 @@ class Socket_Handler:
         client.send(json.dumps(response).encode("utf-8"))
 
     def _handle_status(self, client, msg):
-        estado = msg.get("status", "AVERIADO")
-        self.gestor.actualizar_estado(msg["id"], estado)
-        response = {"type": "status", "id": msg["id"], "status": "OK"}
-        client.send(json.dumps(response).encode("utf-8"))
+        try:
+            estado = msg.get("status", "AVERIADO")
+            self.gestor.actualizar_estado(msg["id"], estado)
+            response = {"type": "status", "id": msg["id"], "status": "OK"}
+            client.send(json.dumps(response).encode("utf-8"))
+        except Exception as e:
+            pass

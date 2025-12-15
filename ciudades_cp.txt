@@ -1,3 +1,4 @@
 MAD1 = Madrid
 MAD2 = Alicante
 MAD3 = Orihuela
+MAD4 = Almeria

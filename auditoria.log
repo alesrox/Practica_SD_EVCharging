@@ -1,0 +1,61 @@
+[2025-12-15 09:34:36] CPs disponibles enviados a DRI1
+[2025-12-15 09:46:03] Clave simetrica compartida con MAD1
+[2025-12-15 09:46:03] CP MAD1 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 09:46:35] CPs disponibles enviados a DRI1
+[2025-12-15 09:47:10] CPs disponibles enviados a DRI2
+[2025-12-15 09:47:13] Clave simetrica compartida con MAD2
+[2025-12-15 09:47:14] CP MAD2 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 09:47:18] CPs disponibles enviados a DRI2
+[2025-12-15 09:47:22] CPs disponibles enviados a DRI1
+[2025-12-15 09:48:21] CP MAD1 pausado desde panel de control
+[2025-12-15 09:48:25] CP MAD1 cambió de DESCONECTADO a PARADO
+[2025-12-15 09:48:37] CP MAD1 cambió de DESCONECTADO a PARADO
+[2025-12-15 09:48:40] CP MAD1 cambió de DESCONECTADO a PARADO
+[2025-12-15 09:49:32] CP MAD1 reaunudado desde panel de control
+[2025-12-15 09:49:34] CP MAD1 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 09:49:41] CP MAD1 pausado desde panel de control
+[2025-12-15 09:49:44] CP MAD1 reaunudado desde panel de control
+[2025-12-15 09:49:47] CP MAD1 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 09:50:02] CP MAD2 pausado desde panel de control
+[2025-12-15 09:50:05] CP MAD2 reaunudado desde panel de control
+[2025-12-15 09:50:06] CP MAD2 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 09:50:38] CP MAD1 pausado desde panel de control
+[2025-12-15 09:51:11] CP MAD1 reaunudado desde panel de control
+[2025-12-15 09:51:11] CP MAD1 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 09:51:47] Clave simetrica compartida con MAD1
+[2025-12-15 09:51:49] Solicitud de suministro de MAD1: denied
+[2025-12-15 09:51:51] Solicitud de suministro de MAD1: denied
+[2025-12-15 09:53:30] CPs disponibles enviados a DRI1
+[2025-12-15 09:53:36] CPs disponibles enviados a DRI2
+[2025-12-15 09:55:16] Clave simetrica compartida con MAD2
+[2025-12-15 09:55:16] CP MAD2 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 09:55:47] Clave simetrica compartida con MAD2
+[2025-12-15 09:55:55] Solicitud de suministro de MAD2: denied
+[2025-12-15 09:56:36] CP MAD2 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 09:58:09] Solicitud de suministro de MAD2: approved
+[2025-12-15 09:58:13] CP MAD2 cambió de ACTIVADO a SUMINISTRANDO
+[2025-12-15 09:58:19] CP MAD2 cambió de SUMINISTRANDO a ACTIVADO
+[2025-12-15 09:58:28] Clave simetrica compartida con MAD2
+[2025-12-15 09:58:29] Solicitud de suministro de MAD2: denied
+[2025-12-15 10:06:50] Clave simetrica compartida con MAD1
+[2025-12-15 10:06:50] CP MAD1 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 10:07:14] Clave simetrica compartida con MAD1
+[2025-12-15 10:07:32] Solicitud de suministro de MAD1: denied
+[2025-12-15 10:08:30] CP MAD1 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 10:10:02] Clave simetrica compartida con MAD1
+[2025-12-15 10:10:03] CP MAD1 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 10:10:22] CP MAD1 pausado desde panel de control
+[2025-12-15 10:10:31] CP MAD1 reaunudado desde panel de control
+[2025-12-15 10:10:33] CP MAD1 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 10:10:51] Clave simetrica compartida con MAD1
+[2025-12-15 10:10:56] Solicitud de suministro de MAD1: denied
+[2025-12-15 10:11:39] CP MAD1 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 10:12:10] Solicitud de suministro de MAD1: approved
+[2025-12-15 10:12:15] CP MAD1 cambió de ACTIVADO a SUMINISTRANDO
+[2025-12-15 10:12:21] CP MAD1 cambió de SUMINISTRANDO a ACTIVADO
+[2025-12-15 10:13:21] CPs disponibles enviados a DRI1
+[2025-12-15 10:13:35] CPs disponibles enviados a DRI2
+[2025-12-15 10:13:37] Clave simetrica compartida con MAD2
+[2025-12-15 10:13:37] CP MAD2 cambió de DESCONECTADO a ACTIVADO
+[2025-12-15 10:20:39] CPs disponibles enviados a DRI2
+[2025-12-15 10:20:45] CPs disponibles enviados a DRI1
